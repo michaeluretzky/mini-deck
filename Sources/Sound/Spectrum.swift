@@ -210,7 +210,11 @@ final class Spectrum {
 enum Imitation {
     static func levels(at t: Double) -> [Float] {
         (0..<BandAnalyzer.centers.count).map { i in
-            Float(0.12 + 0.88 * noise(t * (2.2 + Double(i) * 0.6) + Double(i) * 17.3))
+            let band = Double(i)
+            let speed: Double = 2.2 + band * 0.6
+            let phase: Double = t * speed + band * 17.3
+            let level: Double = 0.12 + 0.88 * noise(phase)
+            return Float(level)
         }
     }
 

@@ -1,6 +1,6 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.4.2 integrates historical song data directly into song, artist and album details and the overall Spotify history. The separate source banner and source tab have been removed. Existing private data is preserved.
+Version 1.4.3 integrates historical song data directly into song, artist and album details and the overall Spotify history. The separate source banner and source tab have been removed. Existing private data is preserved. This release also simplifies animation math for compiler compatibility and keeps the collapse control available when statistics are empty.
 
 Drawer responsiveness: reduces the intentional cover-hover delay from 280 to 90 milliseconds, removes competing content/window resize animations, coalesces size updates, and avoids full-card hover invalidations for every mouse movement. A short exit grace period prevents transient resize events from immediately collapsing the drawer. These are implementation changes, not a measured end-to-end latency guarantee.
 

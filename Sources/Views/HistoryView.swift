@@ -259,13 +259,13 @@ struct HistoryView: View {
             .labelsHidden()
 
             HStack {
-                    Picker("List", selection: Binding(get: { picks.list }, set: { picks.list = $0 })) {
-                        ForEach(HistoryList.allCases) {
-                            Text(source == .spotify && $0 == .recent ? "History" : $0.title).tag($0)
-                        }
+                Picker("List", selection: Binding(get: { picks.list }, set: { picks.list = $0 })) {
+                    ForEach(HistoryList.allCases) {
+                        Text(source == .spotify && $0 == .recent ? "History" : $0.title).tag($0)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
                 if source == .spotify && list != .recent {
                     Picker("Time", selection: Binding(get: { picks.span }, set: { picks.span = $0 })) {
                         ForEach(SpotifyAccount.Span.allCases, id: \.self) { Text($0.label).tag($0) }

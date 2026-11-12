@@ -724,7 +724,7 @@ struct ListeningSection: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Heading(text: deck.source == .spotify ? "Your Spotify" : "Your Music library")
                 Spacer(minLength: 0)
-                if !report.isEmpty {
+                if !report.isEmpty || advanced {
                     Button { hub.prefs.statsAdvanced.toggle() } label: {
                         Label(advanced ? "Show less" : "Show advanced",
                               systemImage: advanced ? "chevron.up" : "chevron.down")
@@ -918,7 +918,8 @@ struct ScopeBlock: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.primary.opacity(0.85))
                 if !scope.tiles.isEmpty {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .topLeading), count: 3),
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .topLeading),
+                                             count: min(3, scope.tiles.count)),
                               alignment: .leading, spacing: 6) {
                         ForEach(Array(scope.tiles.enumerated()), id: \.offset) { item in StatCell(tile: item.element, tint: tint) }
                     }
@@ -976,6 +977,7 @@ struct StatCell: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
+        .help(tile.value + " " + tile.caption)
     }
 }
 
