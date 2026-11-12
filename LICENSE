@@ -1,0 +1,53 @@
+Mini Deck Personal Use License
+
+Copyright (c) 2026 Michael Uretzky. All rights reserved.
+
+Mini Deck, including its source code, design, icon and documentation (the
+"Software"), is owned by the copyright holder. The source code is published
+so people can read it and build the app themselves. It is not open source.
+
+1. What you may do
+
+   You may, free of charge:
+   a. download the Software, and the app files on this repository's
+      Releases page;
+   b. build the Software from source;
+   c. install and use it on computers you own or control, for your own
+      personal, non-commercial use, with your own Spotify or Apple Music
+      account;
+   d. make changes for your own private use on those computers.
+
+2. What you may not do
+
+   Unless you have written permission from the copyright holder, you may not:
+   a. share, publish, upload, sell, rent or sublicense the Software, or any
+      changed version or part of it, in source or built form. Link to this
+      repository instead;
+   b. publish or distribute derivative works, or use the code, design or
+      logic of the Software in another product or service;
+   c. use the Software for commercial purposes, or offer it as a service;
+   d. remove or change copyright, license or trademark notices;
+   e. use the name "Mini Deck" or its icon for another product, or suggest
+      that the copyright holder endorses your product.
+
+3. Your own accounts and data
+
+   You are responsible for your own Spotify developer app, accounts and use
+   of third-party services, and for following their terms. The Software
+   stores your data only on your own computer.
+
+4. Ending this license
+
+   This license ends automatically if you break its terms. When it ends,
+   you must stop using the Software and delete all copies.
+
+5. No warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+   PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+   HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM
+   THE SOFTWARE OR ITS USE.
+
+Spotify is a trademark of Spotify AB. Apple Music and Music are trademarks
+of Apple Inc. Mini Deck is not affiliated with or endorsed by either company.

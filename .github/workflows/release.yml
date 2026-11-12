@@ -1,0 +1,36 @@
+name: Release
+
+# Builds the downloadable app on a GitHub Mac and attaches it to a release.
+# Runs when a version tag such as v1.2 is pushed, or by hand from the Actions tab.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build, for example v1.2"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Build universal app
+        run: zsh make-release.zsh
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Mini Deck ${TAG#v}" --notes-file .github/release-notes.md
+          fi
+          gh release upload "$TAG" dist/Mini-Deck-*.zip dist/Mini-Deck-*.zip.sha256 --clobber

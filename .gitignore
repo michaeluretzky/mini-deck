@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+._*
+
+# Build output
+build/
+dist/
+*.app
+*.iconset
+*.icns
+*.dSYM/
+
+# Secrets and personal data: never commit these
+.env
+.env.*
+*.pem
+*.p8
+*.p12
+*.key
+*.mobileprovision
+secrets*
+credentials*
+listening.json
+
+# Editors
+.vscode/
+.idea/
+*.xcuserstate
+xcuserdata/
