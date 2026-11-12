@@ -39,3 +39,4 @@ jobs:
             gh release create "$TAG" --title "Mini Deck ${TAG#v}" --notes-file .github/release-notes.md
           fi
           gh release upload "$TAG" dist/Mini-Deck-*.zip dist/Mini-Deck-*.zip.sha256 --clobber
+          gh release edit "$TAG" --draft=false --latest
