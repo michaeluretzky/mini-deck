@@ -374,11 +374,61 @@ func checkWrapped() async {
                "missing Wrapped entry is not guessed by artist or title")
         try await library.importFile(input)
         expect(library.playlists.count == 1, "reimport replaces a year without duplicating it")
+        let olderID = String(repeating: "d", count: 22)
+        let older = WrappedLibrary.Playlist(year: 2022, id: olderID, name: "2022",
+            url: "https://open.spotify.com/playlist/\(olderID)", items: [first])
+        let historical = WrappedLibrary.history(from: [list, older])
+        expect(historical.count == 2, "historical songs deduplicate by exact track ID across years")
+        expect(historical.first { $0.trackID == first.trackID }?.years == [2024, 2022],
+               "historical years remain explicit, not a synthetic continuous date range")
+        expect(library.songs.count == 2, "import refreshes the cached historical song index")
+        var track = Snapshot()
+        track.source = .spotify
+        track.trackID = "spotify:track:" + first.trackID
+        track.title = first.title
+        track.artist = first.artist
+        track.album = first.album
+        var report = ListeningReport()
+        StatsBook.addHistorical(track: track, songs: historical, into: &report)
+        report.song.trim(); report.artist.trim(); report.album.trim()
+        expect(report.song.tiles.first?.value == "2024, 2022", "song report incorporates historical years")
+        expect(!report.artist.isEmpty && !report.album.isEmpty, "artist and album incorporate matching historical records")
+        expect([report.song, report.artist, report.album].flatMap(\.tiles).allSatisfy {
+            $0.caption == "years in history" && !$0.value.contains("#")
+        }, "historical records never manufacture play counts, time or rankings")
+        let integrated = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(),
+                                         library: MusicLibrary(), historical: historical)
+        expect(!integrated.song.isEmpty, "historical song data is part of the normal report without live API results")
+        track.trackID = "spotify:track:" + String(repeating: "z", count: 22)
+        track.artist = "Unrelated Artist"
+        var unrelated = ListeningReport()
+        StatsBook.addHistorical(track: track, songs: historical, into: &unrelated)
+        expect(unrelated.isEmpty, "matching titles and album names alone do not associate another artist")
+        track.source = .music
+        let musicOnly = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(),
+                                        library: MusicLibrary(), historical: historical)
+        expect(musicOnly.isEmpty, "Spotify historical evidence is not added to Apple Music")
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let recent = SpotifyAccount.Play(trackID: first.trackID, artistKeys: [], at: date,
+                                        title: first.title, artist: first.artist, album: first.album)
+        let earlier = SpotifyAccount.Play(trackID: first.trackID, artistKeys: [], at: date.addingTimeInterval(-60))
+        let imported = SpotifyArchive.Total(title: first.title, artist: first.artist, album: first.album,
+                                            first: date.addingTimeInterval(-120), last: date.addingTimeInterval(-90))
+        let combined = AccountHistory.songs(recent: [recent, earlier], historical: historical,
+                                            imported: ["spotify:track:" + first.trackID: imported])
+        expect(combined.count == 2, "overall history unifies recent, imported and year-level records by ID")
+        expect(combined.first?.recent == date && combined.first?.years == [2024, 2022],
+               "unified song retains actual recent timestamp and historical years")
+        expect(combined.first?.imported == imported.last, "unified song preserves imported timing separately")
+        expect(combined.last?.latest == nil, "year-only history never gets a fabricated playback timestamp")
+        expect(AccountHistory.songs(recent: [], historical: historical).count == 2,
+               "overall history remains available without recent API data")
         let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
         expect((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600, "saved Wrapped file has private permissions")
         let reload = WrappedLibrary(storageURL: destination)
         for _ in 0..<200 where reload.loading { try await Task.sleep(for: .milliseconds(10)) }
         expect(reload.playlists == library.playlists, "Wrapped snapshot reload preserves source entries")
+        expect(reload.songs == library.songs, "restart restores integrated historical song data")
         try Data("corrupt".utf8).write(to: destination)
         let damaged = WrappedLibrary(storageURL: destination)
         for _ in 0..<200 where damaged.loading { try await Task.sleep(for: .milliseconds(10)) }
@@ -392,6 +442,8 @@ func checkWrapped() async {
         try damaged.clear()
         expect(FileManager.default.fileExists(atPath: input.path), "removing saved Wrapped leaves the original file intact")
         expect(!FileManager.default.fileExists(atPath: destination.path), "removing saved Wrapped deletes only the saved copy")
+        try library.clear()
+        expect(library.songs.isEmpty, "removing historical data clears the integrated song index")
     } catch {
         expect(false, "Wrapped test: \(error.localizedDescription)")
     }

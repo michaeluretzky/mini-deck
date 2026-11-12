@@ -73,7 +73,8 @@ enum StatsBook {
 
     static func report(track: Snapshot, facts: LibraryFacts?, account: SpotifyAccount,
                        library: MusicLibrary, archive: SpotifyArchive? = nil,
-                       span: SpotifyAccount.Span = .short) -> ListeningReport {
+                       span: SpotifyAccount.Span = .short,
+                       historical: [WrappedLibrary.HistoricalSong] = []) -> ListeningReport {
         var out = ListeningReport()
 
         switch track.source {
@@ -100,6 +101,7 @@ enum StatsBook {
             case .waiting: out.prompt = .waiting
             case .failed(let why): out.prompt = .problem(why)
             }
+            addHistorical(track: track, songs: historical, into: &out)
         case .music:
             music(track: track, facts: facts, library: library, into: &out)
             if out.isEmpty && library.scanning { out.prompt = .loading }
@@ -112,6 +114,29 @@ enum StatsBook {
     }
 
     // MARK: Spotify account
+
+    static func addHistorical(track: Snapshot, songs: [WrappedLibrary.HistoricalSong],
+                              into out: inout ListeningReport) {
+        let id = track.trackID.hasPrefix("spotify:track:")
+            ? String(track.trackID.dropFirst("spotify:track:".count)) : ""
+        let artists = Set([track.artist, track.primaryArtist, track.albumArtist]
+            .filter { !$0.isEmpty && $0.caseInsensitiveCompare("Various Artists") != .orderedSame }
+            .map(TitleTidy.key))
+        let artistSongs = songs.filter { artists.contains(TitleTidy.key($0.artist)) }
+        let albumSongs = artistSongs.filter {
+            !track.album.isEmpty && SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album)
+        }
+        func tiles(_ matches: [WrappedLibrary.HistoricalSong]) -> [StatTile] {
+            let years = Set(matches.flatMap(\.years)).sorted(by: >)
+            guard !years.isEmpty else { return [] }
+            return [StatTile(value: years.map(String.init).joined(separator: ", "),
+                             caption: "years in history", symbol: "calendar")]
+        }
+        let source = "Historical song records · partial coverage"
+        out.song.add(tiles(songs.filter { !id.isEmpty && $0.trackID == id }), from: source)
+        out.artist.add(tiles(artistSongs), from: source)
+        out.album.add(tiles(albumSongs), from: source)
+    }
 
     static func importedReport(track: Snapshot, snapshot: SpotifyArchive.Snapshot, coverage: String) -> ListeningReport {
         var out = ListeningReport()

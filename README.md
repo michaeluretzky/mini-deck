@@ -80,13 +80,13 @@ The card prioritizes imported totals and shows the imported date range. Importin
 
 The history window displays up to 100 rows per list, with totals computed across every imported music record. Imports accept extracted JSON files/folders, not ZIP archives; limits are 64 MB per file and 256 MB per batch. Import fewer files at a time if needed. Remove the sanitized copy with **Listening Stats > Remove Imported Spotify History…**.
 
-### Saved Wrapped playlists
+### Historical song data
 
-**Listening History > Wrapped** displays explicitly imported, year-labeled snapshots of saved Spotify Wrapped song playlists. It preserves the supplied playlist order and labels positions as positions, never as play counts or artist/album rankings. The compact card links to the saved years and notes exact track-ID matches without adding anything to streaming totals.
+Historical song records are integrated into **Your Spotify** and **Listening History > Spotify > History**, without a separate source banner. Matching songs, artists and albums show **years in history**. The overall history combines recent account records, imported streaming history and year-level song records, deduplicating exact song IDs. Years are partial historical evidence, not exact listening dates, annual ranks, play counts or listening minutes.
 
-Choose **Listening Stats > Import Wrapped Playlist Snapshot…** to import a `minideck-wrapped-playlists` version-1 JSON snapshot. This is a Mini Deck interchange format, not a reader for arbitrary Spotify Account-data `Wrapped.json` files or screenshots. New installations contain no personal playlists. Files are parsed off the UI thread, bounded to 4 MB, sanitized, and saved locally with owner-only access. Reimporting replaces matching years; unreadable saved files are not overwritten. **Remove Saved Wrapped Snapshot…** deletes only Mini Deck's copy.
+Choose **Listening Stats > Import Historical Song Data…** to import a Mini Deck version-1 historical-song snapshot. Existing snapshot files remain compatible. This interchange format does not accept arbitrary account-summary files or screenshots. New installations contain no personal data. Files are parsed off the UI thread, bounded to 4 MB, sanitized, and saved locally with owner-only access. Reimporting replaces matching years; unreadable saved files are not overwritten. **Remove Historical Song Data…** deletes only Mini Deck's copy.
 
-Saved playlists do not include annual listening minutes, top-fan percentages or every Wrapped story. Spotify lists those broader figures, where available, in the separate **Account data** download; its documentation describes the latest Wrapped data, not guaranteed access to every previous year's summary ([Spotify data guide](https://support.spotify.com/us/article/understanding-your-data/)). This feature does not silently request extra OAuth permissions or claim live Wrapped-summary access.
+Historical song records never add synthetic events to full-history totals or alter Spotify's supplied affinity rankings. Private imports stay on this Mac when accounts change; remove them if they belong to a different account. No extra OAuth permissions are requested.
 
 ### Artist monthly listeners
 

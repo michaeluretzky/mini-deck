@@ -28,20 +28,28 @@ final class WrappedLibrary {
         let capturedAt: String
         var playlists: [Playlist]
     }
+    struct HistoricalSong: Equatable, Sendable {
+        let trackID: String
+        let title: String
+        let artist: String
+        let album: String
+        var years: [Int]
+    }
     enum ImportError: LocalizedError {
         case invalid, tooLarge, damagedSave
         var errorDescription: String? {
             switch self {
             case .invalid:
-                "Choose a valid Mini Deck Wrapped-playlist snapshot. Raw Spotify Wrapped summaries, streaming-history exports and screenshots use different formats."
-            case .tooLarge: "The Wrapped snapshot exceeds the 4 MB limit."
+                "Choose a valid Mini Deck historical-song snapshot. Raw account summaries, streaming-history exports and screenshots use different formats."
+            case .tooLarge: "The historical-song snapshot exceeds the 4 MB limit."
             case .damagedSave:
-                "The existing Wrapped snapshot is unreadable and was not overwritten. Remove its saved copy in Mini Deck before importing again."
+                "The existing historical-song data is unreadable and was not overwritten. Remove its saved copy in Mini Deck before importing again."
             }
         }
     }
 
     private(set) var playlists: [Playlist] = []
+    private(set) var songs: [HistoricalSong] = []
     private(set) var loading = false
     private(set) var busy = false
     private(set) var message = ""
@@ -69,6 +77,7 @@ final class WrappedLibrary {
                 } catch { return (nil, true) }
             }.value
             playlists = result.0?.playlists ?? []
+            songs = Self.history(from: playlists)
             loadError = result.1
             if loadError { message = ImportError.damagedSave.localizedDescription }
             loading = false
@@ -84,6 +93,26 @@ final class WrappedLibrary {
         guard spotifyURI.hasPrefix(prefix) else { return [] }
         let id = String(spotifyURI.dropFirst(prefix.count))
         return playlists.filter { $0.items.contains { $0.trackID == id } }.map(\.year)
+    }
+
+    /// Preserve year-level evidence, never manufacture play events or rankings.
+    nonisolated static func history(from playlists: [Playlist]) -> [HistoricalSong] {
+        var indexed: [String: HistoricalSong] = [:]
+        for playlist in playlists.sorted(by: { $0.year > $1.year }) {
+            for item in playlist.items {
+                if var song = indexed[item.trackID] {
+                    song.years = Array(Set(song.years + [playlist.year])).sorted(by: >)
+                    indexed[item.trackID] = song
+                } else {
+                    indexed[item.trackID] = HistoricalSong(trackID: item.trackID, title: item.title,
+                        artist: item.artist, album: item.album, years: [playlist.year])
+                }
+            }
+        }
+        return indexed.values.sorted {
+            if $0.title != $1.title { return $0.title < $1.title }
+            return $0.trackID < $1.trackID
+        }
     }
 
     func importFile(_ url: URL) async throws {
@@ -112,7 +141,8 @@ final class WrappedLibrary {
             return incoming
         }.value
         playlists = document.playlists
-        message = "Saved Wrapped playlists imported locally. No play counts or listened minutes were inferred."
+        songs = Self.history(from: playlists)
+        message = "Historical song data imported locally. No play counts or listened minutes were inferred."
     }
 
     func clear() throws {
@@ -121,8 +151,9 @@ final class WrappedLibrary {
             try FileManager.default.removeItem(at: storageURL)
         }
         playlists = []
+        songs = []
         loadError = false
-        message = "Saved Wrapped snapshot removed. Spotify playlists and original files are unchanged."
+        message = "Historical song data removed. Spotify and original files are unchanged."
     }
 
     nonisolated static func read(_ url: URL) throws -> Document {

@@ -5,13 +5,12 @@ import AppKit
 import SwiftUI
 
 enum HistorySource: String, CaseIterable, Identifiable {
-    case spotify, archive, wrapped, music, mac
+    case spotify, archive, music, mac
     var id: String { rawValue }
     var title: String {
         switch self {
         case .spotify: "Spotify"
         case .archive: "Spotify import"
-        case .wrapped: "Wrapped"
         case .music: "Apple Music"
         case .mac: "This Mac"
         }
@@ -57,24 +56,13 @@ struct HistoryPage {
 /// Builds history lists from the Spotify account, the Music library and plays counted on this Mac.
 @MainActor
 enum HistoryBook {
-    static func page(_ source: HistorySource, _ list: HistoryList, span: SpotifyAccount.Span, hub: Hub,
-                     wrappedYear: Int = 0) -> HistoryPage {
+    static func page(_ source: HistorySource, _ list: HistoryList, span: SpotifyAccount.Span, hub: Hub) -> HistoryPage {
         var page: HistoryPage
         switch source {
-        case .spotify: page = spotify(list, span: span, account: hub.account)
+        case .spotify: page = spotify(list, span: span, account: hub.account,
+                                     historical: hub.wrapped.songs, imported: hub.archive.snapshot.songs,
+                                     loadingHistory: hub.wrapped.loading || hub.archive.loading)
         case .archive: page = imported(list, archive: hub.archive)
-        case .wrapped:
-            page = HistoryPage()
-            if let saved = hub.wrapped.playlist(year: wrappedYear) {
-                page.rows = saved.items.map {
-                    HistoryRow(rank: nil, title: $0.title, subtitle: "\($0.artist) · \($0.album)",
-                               detail: "Position \($0.position)")
-                }
-                page.note = "Imported \(saved.year) Spotify Wrapped playlist. Playlist order only, not play counts or listening minutes. This is a saved snapshot, not live account history."
-            } else {
-                page.empty = hub.wrapped.loading ? .loading
-                    : .message("No Wrapped playlist snapshot imported. Import one to browse saved yearly songs without mixing them into streaming totals.")
-            }
         case .music: page = music(list, library: hub.library)
         case .mac: page = mac(list, log: hub.log, counting: hub.prefs.countPlays)
         }
@@ -84,8 +72,27 @@ enum HistoryBook {
         return page
     }
 
-    private static func spotify(_ list: HistoryList, span: SpotifyAccount.Span, account: SpotifyAccount) -> HistoryPage {
+    private static func spotify(_ list: HistoryList, span: SpotifyAccount.Span, account: SpotifyAccount,
+                                historical: [WrappedLibrary.HistoricalSong],
+                                imported: [String: SpotifyArchive.Total], loadingHistory: Bool) -> HistoryPage {
         var page = HistoryPage()
+        if list == .recent {
+            let songs = AccountHistory.songs(recent: account.recent, historical: historical, imported: imported)
+            page.rows = songs.map {
+                var details: [String] = []
+                if let at = $0.latest {
+                    details.append(($0.recent == at ? "Recent: " : "Imported: ") + StatsBook.ago(at))
+                }
+                if !$0.years.isEmpty {
+                    details.append("History: " + $0.years.map(String.init).joined(separator: ", "))
+                }
+                return HistoryRow(rank: nil, title: $0.title, subtitle: "\($0.artist) · \($0.album)",
+                                  detail: details.joined(separator: " · "))
+            }
+            page.note = "Available song history across recent account records and private imports. One row per known song ID, not a play count. Year-only records have no exact listening dates; coverage is incomplete."
+            if !page.rows.isEmpty { return page }
+            if loadingHistory { page.empty = .loading; return page }
+        }
         switch account.status {
         case .off, .failed: page.empty = .connectSpotify; return page
         case .expired: page.empty = .reconnectSpotify; return page
@@ -229,7 +236,6 @@ final class HistoryPicks {
     var source: HistorySource
     var list: HistoryList = .recent
     var span: SpotifyAccount.Span = .short
-    var wrappedYear = 0
 
     init(source: HistorySource) { self.source = source }
 }
@@ -244,7 +250,7 @@ struct HistoryView: View {
     private var sourceBinding: Binding<HistorySource> { Binding(get: { picks.source }, set: { picks.source = $0 }) }
 
     var body: some View {
-        let page = HistoryBook.page(source, list, span: span, hub: hub, wrappedYear: picks.wrappedYear)
+        let page = HistoryBook.page(source, list, span: span, hub: hub)
         VStack(alignment: .leading, spacing: 10) {
             Picker("Source", selection: sourceBinding) {
                 ForEach(HistorySource.allCases) { Text($0.title).tag($0) }
@@ -253,23 +259,13 @@ struct HistoryView: View {
             .labelsHidden()
 
             HStack {
-                if source == .wrapped {
-                    Text("Saved yearly songs").font(.headline)
-                    Spacer()
-                    if !hub.wrapped.playlists.isEmpty {
-                        Picker("Wrapped year", selection: Binding(
-                            get: { hub.wrapped.playlist(year: picks.wrappedYear)?.year ?? 0 },
-                            set: { picks.wrappedYear = $0 })) {
-                            ForEach(hub.wrapped.playlists) { Text(String($0.year)).tag($0.year) }
-                        }.frame(width: 150)
-                    }
-                } else {
                     Picker("List", selection: Binding(get: { picks.list }, set: { picks.list = $0 })) {
-                        ForEach(HistoryList.allCases) { Text($0.title).tag($0) }
+                        ForEach(HistoryList.allCases) {
+                            Text(source == .spotify && $0 == .recent ? "History" : $0.title).tag($0)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                }
                 if source == .spotify && list != .recent {
                     Picker("Time", selection: Binding(get: { picks.span }, set: { picks.span = $0 })) {
                         ForEach(SpotifyAccount.Span.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -297,16 +293,13 @@ struct HistoryView: View {
                     Text(hub.archive.message).font(.system(size: 10)).foregroundStyle(.secondary)
                 }
             }
-            if source == .wrapped {
+            if source == .spotify {
                 HStack {
-                    Button("Import Wrapped…") { hub.importWrapped() }
+                    Button("Import historical songs…") { hub.importWrapped() }
                         .disabled(hub.wrapped.loading || hub.wrapped.busy)
-                    if let saved = hub.wrapped.playlist(year: picks.wrappedYear), let url = URL(string: saved.url) {
-                        Link("Open in Spotify", destination: url)
-                    }
                     Spacer()
                     if !hub.wrapped.playlists.isEmpty || hub.wrapped.loadError {
-                        Button("Remove snapshot…") { hub.clearWrapped() }
+                        Button("Remove historical songs…") { hub.clearWrapped() }
                             .disabled(hub.wrapped.loading || hub.wrapped.busy)
                     }
                 }
@@ -396,7 +389,7 @@ final class HistoryWindow {
                              backing: .buffered, defer: false)
             w.title = "Listening History"
             w.isReleasedWhenClosed = false
-            let picks = HistoryPicks(source: hub.deck.source == .music ? .music : (hub.archive.hasHistory ? .archive : .spotify))
+            let picks = HistoryPicks(source: hub.deck.source == .music ? .music : .spotify)
             self.picks = picks
             w.contentView = NSHostingView(rootView: HistoryView(hub: hub, picks: picks))
             w.setFrameAutosaveName("MiniDeckHistory")

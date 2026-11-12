@@ -1,10 +1,10 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.4.1 separates song, artist and album into three icon-led rows, with more space before the controls and playback bar.
+Version 1.4.2 integrates historical song data directly into song, artist and album details and the overall Spotify history. The separate source banner and source tab have been removed. Existing private data is preserved.
 
 Drawer responsiveness: reduces the intentional cover-hover delay from 280 to 90 milliseconds, removes competing content/window resize animations, coalesces size updates, and avoids full-card hover invalidations for every mouse movement. A short exit grace period prevents transient resize events from immediately collapsing the drawer. These are implementation changes, not a measured end-to-end latency guarantee.
 
-**Saved Wrapped playlists:** a private snapshot importer and year selector in Listening History. Playlist positions are labeled as positions, not inferred play counts or listening minutes, and stay separate from live rankings and full-history totals. The card links to saved years and shows exact song matches. Public downloads contain no personal playlist data; this importer accepts Mini Deck's snapshot format, not raw Spotify Wrapped summary files.
+**Integrated history:** song details show known historical years, including when a song is absent from current API results. **Listening History > Spotify > History** combines recent account records, imported streaming history and historical song records, deduplicating exact song IDs. Year-only data never becomes play counts, listening minutes, synthetic playback dates or rankings. Public downloads contain no personal data; existing Mini Deck historical-song snapshots remain compatible.
 
 The compact **Your Spotify** section now shows Spotify artist/song rankings for one selected period and **Last recent play**, limited to returned recent history. **Show advanced** retains detailed lists. Live occurrence counts and synthetic album rankings have been removed; live API data is not presented as lifetime totals, actual listened minutes or first-ever listens. Spotify rankings describe affinity, not measured play counts ([Spotify top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks)).
 

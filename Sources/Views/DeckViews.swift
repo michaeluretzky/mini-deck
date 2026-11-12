@@ -717,7 +717,8 @@ struct ListeningSection: View {
 
     var body: some View {
         let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
-                                      library: hub.library, archive: hub.archive, span: hub.prefs.spotifySpan)
+                                      library: hub.library, archive: hub.archive, span: hub.prefs.spotifySpan,
+                                      historical: hub.wrapped.songs)
         VStack(alignment: .leading, spacing: 8) {
             let advanced = hub.prefs.statsAdvanced
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -753,7 +754,7 @@ struct ListeningSection: View {
                 }
             }
             if advanced {
-                let empty = deck.source == .spotify ? "Not present in the available Spotify history." : ""
+                let empty = deck.source == .spotify ? "No matching records available." : ""
                 ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead, emptyText: empty)
@@ -766,27 +767,10 @@ struct ListeningSection: View {
             if deck.source == .spotify {
                 Text(hub.archive.hasHistory ? "Imported Spotify history · all devices" : "Spotify account · all devices")
                     .font(.system(size: 9)).foregroundStyle(.secondary)
-                if !hub.wrapped.playlists.isEmpty {
-                    Button { hub.showHistory(source: .wrapped) } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "clock.arrow.circlepath")
-                            Text("Saved Wrapped playlists")
-                            Spacer(minLength: 0)
-                            Text(hub.wrapped.playlists.map { String($0.year) }.joined(separator: " · "))
-                                .lineLimit(1)
-                            Image(systemName: "arrow.up.right")
-                        }.font(.system(size: 10))
-                    }.buttonStyle(.plain).foregroundStyle(deck.swatch.lead)
-                    let years = hub.wrapped.yearsContaining(deck.track.trackID)
-                    if !years.isEmpty {
-                        Text("This song appears in your saved \(years.map(String.init).joined(separator: ", ")) playlist(s).")
-                            .font(.system(size: 9)).foregroundStyle(.secondary)
-                    }
-                }
                 if advanced {
                     Quiet(text: hub.archive.hasHistory
                           ? "Export: \(hub.archive.coverage). Plays count listens ≥30 seconds; time includes shorter listens. New plays after the export are not added to these totals."
-                          : "Spotify rankings reflect affinity, not play counts. Missing from a returned list does not mean never played.")
+                          : "Rankings reflect affinity. Historical years are partial records, not play counts or exact listening dates.")
                     Button(hub.archive.busy ? "Importing…" : "Import full Spotify history…") { hub.importSpotifyHistory() }
                         .buttonStyle(.plain).font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(deck.swatch.lead)
@@ -855,10 +839,21 @@ struct SpotifySummary: View {
     let tint: Color
     var body: some View {
         VStack(spacing: 5) {
-            row("Artist ranking", report.artist.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
-            row("Song ranking", report.song.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
-            row("Last recent play", report.song.tiles.first { $0.caption == "last in recent history" }?.value ?? "Not in recent history")
-            Text("Spotify affinity rankings · recent history only")
+            if let years = report.song.tiles.first(where: { $0.caption == "years in history" }) {
+                row("Song history", years.value)
+            }
+            if let rank = report.song.tiles.first(where: { $0.caption.hasPrefix("Spotify ranking") }) {
+                row("Song ranking", rank.value)
+            }
+            if let rank = report.artist.tiles.first(where: { $0.caption.hasPrefix("Spotify ranking") }) {
+                row("Artist ranking", rank.value)
+            } else if let years = report.artist.tiles.first(where: { $0.caption == "years in history" }) {
+                row("Artist history", years.value)
+            }
+            if let last = report.song.tiles.first(where: { $0.caption == "last in recent history" }) {
+                row("Last recent play", last.value)
+            }
+            Text("Available account history · partial coverage")
                 .font(.system(size: 9)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
