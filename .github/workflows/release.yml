@@ -1,3 +1,6 @@
+# Mini Deck. Copyright (c) 2026 Michael Uretzky. All rights reserved.
+# Free for personal use. See LICENSE.
+
 name: Release
 
 # Builds the downloadable app on a GitHub Mac and attaches it to a release.
