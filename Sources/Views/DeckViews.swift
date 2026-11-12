@@ -12,7 +12,7 @@ struct DeckRoot: View {
             .fixedSize(horizontal: false, vertical: true)
             .background(GeometryReader { g in
                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in
-                    DispatchQueue.main.async { hub.stage.fit(height: height, growDown: hub.pointer.drawerOpen) }
+                    hub.stage.scheduleFit(height: height, growDown: hub.pointer.drawerOpen)
                 }
             })
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -48,7 +48,7 @@ struct DeckCard: View {
                     .fill(LinearGradient(colors: [sw.lead.opacity(0.45), sw.echo.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 1)
                 InfoDrawer(hub: hub, deck: deck)
-                    .transition(.opacity.combined(with: .offset(y: -6)))
+                    .transition(.identity)
             }
         }
         .padding(Metrics.inset)
@@ -70,10 +70,10 @@ struct DeckCard: View {
         .contextMenu { CardMenu(hub: hub, deck: deck, stage: stage, prefs: prefs) }
         .padding(Metrics.halo)
         .background { Halo(swatch: sw, spectrum: spectrum, playing: deck.isPlaying) }
-        .animation(.smooth(duration: 0.25), value: pointer.drawerOpen)
         .animation(.easeInOut(duration: 0.25), value: deck.track.title)
         .animation(.easeInOut(duration: 0.7), value: sw)
         .animation(.easeOut(duration: 0.15), value: deck.hud)
+        .animation(nil, value: pointer.drawerOpen)
     }
 }
 

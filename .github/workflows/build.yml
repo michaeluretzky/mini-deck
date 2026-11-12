@@ -38,7 +38,7 @@ jobs:
           export CLANG_MODULE_CACHE_PATH="$cache"
           xcrun swiftc -swift-version 5 -warnings-as-errors -module-name MiniDeckTests -target arm64-apple-macos14.0 \
             -module-cache-path "$cache" \
-            Sources/Stats/*.swift Sources/Liner/*.swift Sources/Playback/Players.swift Tests/main.swift \
+            Sources/Stats/*.swift Sources/Liner/*.swift Sources/Playback/Players.swift Sources/Stage/Pointer.swift Tests/main.swift \
             -o "$RUNNER_TEMP/HistoryTests"
           "$RUNNER_TEMP/HistoryTests"
 

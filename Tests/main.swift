@@ -5,6 +5,7 @@
 // Built and run by the Build workflow: see .github/workflows/build.yml.
 
 import Foundation
+import Observation
 
 nonisolated(unsafe) var failures = 0
 nonisolated(unsafe) var checks = 0
@@ -282,6 +283,51 @@ func checkImportPersistence() async {
     }
 }
 
+@MainActor
+func checkPointer() async {
+    let pointer = Pointer()
+    pointer.register(Zone.card, CGRect(x: 0, y: 0, width: 448, height: 700))
+    pointer.register(Zone.cover, CGRect(x: 12, y: 12, width: 132, height: 132))
+    pointer.register(Zone.transport, CGRect(x: 170, y: 100, width: 240, height: 40))
+    pointer.register(Zone.scrubber, CGRect(x: 170, y: 155, width: 240, height: 30))
+    pointer.location = CGPoint(x: 20, y: 20)
+    try? await Task.sleep(for: .milliseconds(180))
+    expect(pointer.drawerOpen, "cover hover opens the drawer")
+    nonisolated(unsafe) var invalidations = 0
+    withObservationTracking {
+        _ = pointer.over(Zone.cover)
+    } onChange: {
+        invalidations += 1
+    }
+    for x in 21...120 { pointer.location = CGPoint(x: x, y: 30) }
+    expect(invalidations == 0, "100 moves inside one region do not invalidate observed hover state")
+    pointer.location = CGPoint(x: 250, y: 300)
+    expect(invalidations == 1, "region boundary publishes one hover change")
+    expect(pointer.drawerOpen, "drawer stays open while reading statistics")
+    pointer.location = nil
+    expect(pointer.drawerOpen, "transient tracking-area exit does not collapse immediately")
+    pointer.location = CGPoint(x: 250, y: 300)
+    try? await Task.sleep(for: .milliseconds(180))
+    expect(pointer.drawerOpen, "re-entry cancels delayed close")
+    pointer.location = CGPoint(x: 200, y: 115)
+    expect(!pointer.drawerOpen, "transport controls close the drawer without waiting")
+    pointer.location = CGPoint(x: 20, y: 20)
+    pointer.location = nil
+    try? await Task.sleep(for: .milliseconds(180))
+    expect(!pointer.drawerOpen, "brief cover crossing cancels opening")
+    pointer.location = CGPoint(x: 20, y: 20)
+    try? await Task.sleep(for: .milliseconds(180))
+    pointer.frozen = true
+    expect(!pointer.drawerOpen && pointer.hovered.isEmpty, "drag freeze closes and clears hover")
+    pointer.frozen = false
+    try? await Task.sleep(for: .milliseconds(180))
+    expect(pointer.drawerOpen, "unfreezing restores hover without extra pointer motion")
+    pointer.location = nil
+    try? await Task.sleep(for: .milliseconds(180))
+    expect(!pointer.drawerOpen, "real pointer exit closes after grace period")
+}
+
 await checkImportPersistence()
+await checkPointer()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

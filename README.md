@@ -32,6 +32,7 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 
 - Play, pause, skip, shuffle, repeat and seek from a small card that floats over your windows.
 - Song, artist and album appear on separate icon-led rows, with extra spacing before the controls and playback bar.
+- Responsive hover drawer: short opening delay, no competing resize animations, region-based hover updates, and a brief exit grace period to limit flicker.
 - Scroll over the card to change the volume.
 - The card's colors come from the album cover.
 - Rest the pointer on the cover to see:

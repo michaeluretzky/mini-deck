@@ -76,6 +76,8 @@ final class Stage {
     private(set) var isShown = false
     @ObservationIgnored private var panel: DeckPanel?
     @ObservationIgnored private var grab: (mouse: NSPoint, origin: NSPoint)?
+    @ObservationIgnored private var pendingFit: (height: CGFloat, growDown: Bool)?
+    @ObservationIgnored private var fitScheduled = false
     @ObservationIgnored var onScaleChange: ((CGFloat) -> Void)?
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
@@ -239,65 +241,34 @@ final class Stage {
     }
 
     /// Grows or shrinks to the content. The top edge stays put unless the card sits on the bottom edge.
+    /// Coalesce layout measurements rather than queueing stale window sizes.
+    func scheduleFit(height: CGFloat, growDown: Bool) {
+        pendingFit = (height, growDown)
+        guard !fitScheduled else { return }
+        fitScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.fitScheduled = false
+            guard let next = self.pendingFit else { return }
+            self.pendingFit = nil
+            self.fit(height: next.height, growDown: next.growDown)
+        }
+    }
+
     func fit(height: CGFloat, growDown: Bool) {
         guard let panel, height > 30 else { return }
+        let height = ceil(height * scale) / scale
         let f = panel.frame
         guard abs(f.height - height) > 0.5 || f.width != Metrics.panelWidth else { return }
         let onBottom = playArea(for: f).map { abs(f.minY - $0.minY) < 2 } ?? false
         var next = NSRect(x: f.minX, y: (onBottom && !growDown) ? f.minY : f.maxY - height,
                           width: Metrics.panelWidth, height: height)
         next.origin = magnetize(next, clamp: true)
-        if grab != nil || !panel.isVisible { panel.setFrame(next, display: true) } else { glide(to: next) }
+        // Content expansion must not start an AppKit animation for every
+        // SwiftUI size measurement. Keep gliding only for explicit moves.
+        panel.setFrame(next, display: true, animate: false)
+        if next.origin != f.origin { remember(next) }
     }
-}
-
-/// Pointer position plus the on-screen rectangles of the parts that react to it.
-@MainActor @Observable
-final class Pointer {
-    var location: CGPoint? { didSet { evaluate() } }
-    var frozen = false { didSet { evaluate() } }
-    /// 0...1 while the progress bar is being dragged.
-    var scrub: Double?
-    private(set) var zones: [String: CGRect] = [:]
-    private(set) var drawerOpen = false
-    @ObservationIgnored private var opener: Task<Void, Never>?
-
-    func register(_ id: String, _ rect: CGRect) {
-        if zones[id] != rect { zones[id] = rect }
-    }
-
-    func over(_ id: String) -> Bool {
-        guard !frozen, let p = location, let r = zones[id] else { return false }
-        return r.contains(p)
-    }
-
-    private func evaluate() {
-        let onCover = over(Zone.cover)
-        if onCover && !drawerOpen && opener == nil {
-            opener = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(280))
-                guard let self, !Task.isCancelled else { return }
-                self.opener = nil
-                if self.over(Zone.cover) { self.drawerOpen = true }
-            }
-        } else if !onCover {
-            opener?.cancel()
-            opener = nil
-        }
-        // Stays open while reading below; closes on leaving the card or reaching the controls.
-        if drawerOpen && !onCover {
-            if frozen || location == nil || !over(Zone.card) || over(Zone.transport) || over(Zone.scrubber) {
-                drawerOpen = false
-            }
-        }
-    }
-}
-
-enum Zone {
-    static let card = "card"
-    static let cover = "cover"
-    static let transport = "transport"
-    static let scrubber = "scrubber"
 }
 
 enum Space {
