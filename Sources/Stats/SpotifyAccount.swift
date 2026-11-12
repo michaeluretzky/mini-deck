@@ -85,8 +85,8 @@ final class SpotifyAccount {
     @ObservationIgnored private var pausedUntil = Date.distantPast
     @ObservationIgnored private var busy = false
 
-    init() {
-        if let entry = Vault.load() {
+    init(loadStoredCredentials: Bool = true) {
+        if loadStoredCredentials, let entry = Vault.load() {
             stored = entry
             status = .on
         }

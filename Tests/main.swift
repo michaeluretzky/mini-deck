@@ -57,7 +57,7 @@ await MainActor.run {
         track.album = "First Album"
         track.albumArtist = "The Band"
         let facts = LibraryFacts(plays: 10, skips: 1, lastPlayed: Date(timeIntervalSince1970: now - day), added: nil, favorite: true)
-        let report = StatsBook.report(track: track, facts: facts, account: SpotifyAccount(), library: library)
+        let report = StatsBook.report(track: track, facts: facts, account: SpotifyAccount(loadStoredCredentials: false), library: library)
         expect(report.song.tiles.count == 3, "song row holds 3 tiles")
         expect(report.song.tiles.first?.value == "10", "song plays tile")
         expect(report.artist.tiles.first?.value == "14", "artist plays tile")
@@ -396,7 +396,7 @@ func checkWrapped() async {
         expect([report.song, report.artist, report.album].flatMap(\.tiles).allSatisfy {
             $0.caption == "years in history" && !$0.value.contains("#")
         }, "historical records never manufacture play counts, time or rankings")
-        let integrated = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(),
+        let integrated = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(loadStoredCredentials: false),
                                          library: MusicLibrary(), historical: historical)
         expect(!integrated.song.isEmpty, "historical song data is part of the normal report without live API results")
         track.trackID = "spotify:track:" + String(repeating: "z", count: 22)
@@ -405,7 +405,7 @@ func checkWrapped() async {
         StatsBook.addHistorical(track: track, songs: historical, into: &unrelated)
         expect(unrelated.isEmpty, "matching titles and album names alone do not associate another artist")
         track.source = .music
-        let musicOnly = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(),
+        let musicOnly = StatsBook.report(track: track, facts: nil, account: SpotifyAccount(loadStoredCredentials: false),
                                         library: MusicLibrary(), historical: historical)
         expect(musicOnly.isEmpty, "Spotify historical evidence is not added to Apple Music")
         let date = Date(timeIntervalSince1970: 1_700_000_000)
