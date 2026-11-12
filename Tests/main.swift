@@ -71,7 +71,7 @@ MainActor.assumeIsolated {
 
     // MARK: Plays counted on this Mac
 
-    let log = ListeningLog()
+    let log = ListeningLog(persist: false)
     log.clear()
     var snap = Snapshot()
     snap.source = .spotify

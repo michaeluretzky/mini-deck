@@ -45,9 +45,11 @@ final class ListeningLog {
     @ObservationIgnored private var lastTick: Date?
     @ObservationIgnored private var lastPosition: Double = 0
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private let persists: Bool
 
-    init() {
-        book = Self.load() ?? Book(since: Date())
+    init(persist: Bool = true) {
+        persists = persist
+        book = (persist ? Self.load() : nil) ?? Book(since: Date())
     }
 
     static func songKey(artist: String, title: String) -> String {
@@ -171,21 +173,23 @@ final class ListeningLog {
 
     func clear() {
         saveTask?.cancel()
+        saveTask = nil
         book = Book(since: Date())
         listenKey = ""
         heard = 0
         counted = false
-        try? FileManager.default.removeItem(at: Self.fileURL)
+        lastTick = nil
+        if persists { try? FileManager.default.removeItem(at: Self.fileURL) }
     }
 
     func flush() {
         saveTask?.cancel()
         saveTask = nil
-        Self.save(book)
+        if persists { Self.save(book) }
     }
 
     private func scheduleSave() {
-        guard saveTask == nil else { return }
+        guard persists, saveTask == nil else { return }
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(20))
             guard let self, !Task.isCancelled else { return }

@@ -106,7 +106,7 @@ final class SpotifyArchive {
                     message = loadError ?? ""
                 }
                 loading = false
-                if !loaded.1 { restoreWatch() }
+                if !loaded.1, storageURL == Self.defaultURL { restoreWatch() }
             }
         }
     }
@@ -143,6 +143,7 @@ final class SpotifyArchive {
                 let folder = destination.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                         attributes: [.posixPermissions: 0o700])
+                try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
                 let data = try JSONEncoder().encode(merged.events)
                 try data.write(to: destination, options: [.atomic])
                 try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
