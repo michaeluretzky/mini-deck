@@ -105,6 +105,30 @@ MainActor.assumeIsolated {
     let decoded = try? decoder.decode(ListeningLog.Song.self, from: Data(old.utf8))
     expect(decoded?.plays == 2 && decoded?.album == nil, "1.2 history still loads")
 
+    // MARK: Playback reader compilation
+
+    // `st` is an AppleScript reserved token. Swift compilation cannot catch
+    // invalid identifiers inside embedded AppleScript, so compile every local
+    // binding even on CI machines without Spotify installed.
+    let bindingPattern = try! NSRegularExpression(pattern: #"(?m)^\s*set ([A-Za-z][A-Za-z0-9]*) to "#)
+    for source in Source.allCases {
+        let reader = Players.readerSource(source)
+        let text = reader as NSString
+        let names = bindingPattern.matches(in: reader, range: NSRange(location: 0, length: text.length))
+            .map { text.substring(with: $0.range(at: 1)) }
+        let bindings = names.map { "set \($0) to 0" }.joined(separator: "\n")
+        var error: NSDictionary?
+        let script = NSAppleScript(source: bindings)
+        expect(!names.isEmpty && script?.compileAndReturnError(&error) == true,
+               "\(source.name) reader variable names compile")
+        if Players.isInstalled(source) {
+            let fullScript = NSAppleScript(source: reader)
+            error = nil
+            expect(fullScript?.compileAndReturnError(&error) == true,
+                   "\(source.name) full reader compiles: \(error?.description ?? "OK")")
+        }
+    }
+
     // MARK: Formatting
 
     expect(StatsBook.plays(1) == "1 play" && StatsBook.plays(3) == "3 plays", "play wording")

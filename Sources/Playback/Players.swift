@@ -98,7 +98,7 @@ enum Players {
     // Both readers return the same list:
     //  1 state, 2 name, 3 artist, 4 album, 5 album artist, 6 artwork URL, 7 track ID,
     //  8 position (s), 9 length, 10 shuffle, 11 repeat, 12 volume
-    private static func readerSource(_ source: Source) -> String {
+    static func readerSource(_ source: Source) -> String {
         let guarded: [(Int, String)]
         let tail: String
         switch source {
@@ -124,9 +124,9 @@ enum Players {
         let fields = guarded.map { "try\nset item \($0.0) of out to (\($0.1))\nend try" }.joined(separator: "\n")
         return """
         tell application id "\(source.bundle)"
-        set st to (player state as text)
-        if st is "stopped" then return {st}
-        set out to {st, "", "", "", "", "", "", 0, 0, false, false, 0}
+        set playbackStatus to (player state as text)
+        if playbackStatus is "stopped" then return {playbackStatus}
+        set out to {playbackStatus, "", "", "", "", "", "", 0, 0, false, false, 0}
         try
         set tr to current track
         \(fields)
