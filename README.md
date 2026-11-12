@@ -42,7 +42,7 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 
 ## Your listening stats
 
-Rest the pointer on the cover. "Your listening" shows three parts:
+Rest the pointer on the cover. "Your listening" starts as one compact row with the top stat for the song, the artist and the album. Click **Show advanced** to see everything (Mini Deck remembers your choice):
 
 - **This song:** plays, last played, top-song rank, favorite, date added.
 - **This artist:** top-artist rank, total plays, songs played, last played, when you first heard them, and your top 3 songs by them.

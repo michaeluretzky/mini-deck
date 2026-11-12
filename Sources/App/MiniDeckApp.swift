@@ -185,6 +185,7 @@ enum PrefKey {
     static let anchor = "minideck.anchorTopLeft"
     static let choice = "minideck.source"
     static let countPlays = "minideck.countPlays"
+    static let statsAdvanced = "minideck.statsAdvanced"
 }
 
 @MainActor @Observable
@@ -198,6 +199,9 @@ final class Prefs {
     var countPlays: Bool {
         didSet { UserDefaults.standard.set(countPlays, forKey: PrefKey.countPlays) }
     }
+    var statsAdvanced: Bool {
+        didSet { UserDefaults.standard.set(statsAdvanced, forKey: PrefKey.statsAdvanced) }
+    }
     private(set) var openAtLogin: Bool
 
     init() {
@@ -205,6 +209,7 @@ final class Prefs {
         soundBars = store.object(forKey: PrefKey.soundBars) as? Bool ?? Metrics.soundBarsOn
         choice = store.string(forKey: PrefKey.choice).flatMap(SourceChoice.init(rawValue:)) ?? .automatic
         countPlays = store.object(forKey: PrefKey.countPlays) as? Bool ?? true
+        statsAdvanced = store.bool(forKey: PrefKey.statsAdvanced)
         openAtLogin = SMAppService.mainApp.status == .enabled
         if !store.bool(forKey: PrefKey.loginSeeded) {
             store.set(true, forKey: PrefKey.loginSeeded)

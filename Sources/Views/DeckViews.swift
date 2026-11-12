@@ -646,9 +646,20 @@ struct ListeningSection: View {
         let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
                                       library: hub.library, log: hub.log, counting: hub.prefs.countPlays)
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+            let advanced = hub.prefs.statsAdvanced
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Heading(text: "Your listening")
                 Spacer(minLength: 0)
+                if !report.isEmpty {
+                    Button { hub.prefs.statsAdvanced.toggle() } label: {
+                        Label(advanced ? "Show less" : "Show advanced",
+                              systemImage: advanced ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(deck.swatch.lead)
+                    .help(advanced ? "Show only the summary" : "Show all stats for this song, artist and album")
+                }
                 Button { hub.showHistory() } label: {
                     Label("History", systemImage: "clock.arrow.circlepath").font(.system(size: 10, weight: .semibold))
                 }
@@ -656,9 +667,13 @@ struct ListeningSection: View {
                 .foregroundStyle(deck.swatch.lead)
                 .help("Open your full listening history")
             }
-            ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead)
-            ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead)
-            ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead)
+            if advanced {
+                ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead)
+                ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead)
+                ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead)
+            } else if !report.isEmpty {
+                SummaryRow(report: report, tint: deck.swatch.lead)
+            }
             prompt(report.prompt)
             if report.isEmpty && report.prompt == .none {
                 Quiet(text: hub.prefs.countPlays ? "Keep listening and your stats for this song, artist and album will appear here."
@@ -694,6 +709,45 @@ struct ListeningSection: View {
             Quiet(text: text)
             Spacer(minLength: 0)
             Button(label) { hub.askToConnectSpotify() }.controlSize(.small)
+        }
+    }
+}
+
+/// Collapsed view: one top stat each for the song, artist and album.
+struct SummaryRow: View {
+    let report: ListeningReport
+    let tint: Color
+
+    var body: some View {
+        let picks: [(String, StatTile)] = [("Song", report.song), ("Artist", report.artist), ("Album", report.album)]
+            .compactMap { label, scope in scope.tiles.first.map { (label, $0) } }
+        HStack(alignment: .top, spacing: 6) {
+            ForEach(picks, id: \.0) { label, tile in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label.uppercased())
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 4) {
+                        if let symbol = tile.symbol {
+                            Image(systemName: symbol).font(.system(size: 9, weight: .semibold)).foregroundStyle(tint)
+                        }
+                        Text(tile.value)
+                            .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    Text(tile.caption)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
+                .help(tile.value + " " + tile.caption)
+            }
         }
     }
 }
