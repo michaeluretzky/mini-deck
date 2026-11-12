@@ -80,6 +80,14 @@ The card prioritizes imported totals and shows the imported date range. Importin
 
 The history window displays up to 100 rows per list, with totals computed across every imported music record. Imports accept extracted JSON files/folders, not ZIP archives; limits are 64 MB per file and 256 MB per batch. Import fewer files at a time if needed. Remove the sanitized copy with **Listening Stats > Remove Imported Spotify History…**.
 
+### Saved Wrapped playlists
+
+**Listening History > Wrapped** displays explicitly imported, year-labeled snapshots of saved Spotify Wrapped song playlists. It preserves the supplied playlist order and labels positions as positions, never as play counts or artist/album rankings. The compact card links to the saved years and notes exact track-ID matches without adding anything to streaming totals.
+
+Choose **Listening Stats > Import Wrapped Playlist Snapshot…** to import a `minideck-wrapped-playlists` version-1 JSON snapshot. This is a Mini Deck interchange format, not a reader for arbitrary Spotify Account-data `Wrapped.json` files or screenshots. New installations contain no personal playlists. Files are parsed off the UI thread, bounded to 4 MB, sanitized, and saved locally with owner-only access. Reimporting replaces matching years; unreadable saved files are not overwritten. **Remove Saved Wrapped Snapshot…** deletes only Mini Deck's copy.
+
+Saved playlists do not include annual listening minutes, top-fan percentages or every Wrapped story. Spotify lists those broader figures, where available, in the separate **Account data** download; its documentation describes the latest Wrapped data, not guaranteed access to every previous year's summary ([Spotify data guide](https://support.spotify.com/us/article/understanding-your-data/)). This feature does not silently request extra OAuth permissions or claim live Wrapped-summary access.
+
 ### Artist monthly listeners
 
 The artist/band heading shows Spotify monthly listeners only when verifiable description metadata is returned by that artist's public Spotify page, with Spotify explicitly named. Exact or rounded values are retained as published. Successful results are cached in memory for six hours; missing results for 15 minutes. This is best-effort public-page data, not a supported Web API metric.

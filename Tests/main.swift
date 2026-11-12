@@ -327,7 +327,78 @@ func checkPointer() async {
     expect(!pointer.drawerOpen, "real pointer exit closes after grace period")
 }
 
+@MainActor
+func checkWrapped() async {
+    let first = WrappedLibrary.Item(position: 1, trackID: String(repeating: "a", count: 22),
+                                    title: "Fixture Song", artist: "Fixture Artist", album: "Fixture Album")
+    let third = WrappedLibrary.Item(position: 3, trackID: String(repeating: "b", count: 22),
+                                    title: "Another Fixture", artist: "Fixture Artist", album: "Fixture Album")
+    let id = String(repeating: "c", count: 22)
+    let list = WrappedLibrary.Playlist(year: 2024, id: id, name: "Your Top Songs 2024",
+                                      url: "https://open.spotify.com/playlist/\(id)", items: [third, first])
+    let document = WrappedLibrary.Document(capturedAt: "2025-01-01T00:00:00Z", playlists: [list])
+    do {
+        let data = try JSONEncoder().encode(document)
+        let parsed = try WrappedLibrary.parse(data)
+        expect(parsed.playlists[0].items.map(\.position) == [1, 3], "Wrapped preserves supplied positions, including gaps")
+        var raw = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        raw["username"] = "PRIVATE_USERNAME"
+        raw["token"] = "PRIVATE_TOKEN"
+        let sanitized = try WrappedLibrary.parse(JSONSerialization.data(withJSONObject: raw))
+        let savedText = String(decoding: try JSONEncoder().encode(sanitized), as: UTF8.self)
+        expect(!savedText.contains("PRIVATE"), "unknown private fields are not retained")
+        raw["version"] = 999
+        expect((try? WrappedLibrary.parse(JSONSerialization.data(withJSONObject: raw))) == nil, "unknown Wrapped snapshot version rejected")
+        expect((try? WrappedLibrary.parse(Data("[]".utf8))) == nil, "streaming export is not mistaken for Wrapped playlists")
+        expect((try? WrappedLibrary.parse(Data(repeating: 0, count: WrappedLibrary.byteLimit + 1))) == nil,
+               "Wrapped import has a bounded size")
+        var duplicate = document
+        duplicate.playlists.append(list)
+        expect((try? WrappedLibrary.parse(JSONEncoder().encode(duplicate))) == nil, "duplicate Wrapped years rejected")
+        let badURL = WrappedLibrary.Playlist(year: 2024, id: id, name: "Your Top Songs 2024",
+                                             url: "file:///private/data", items: [first])
+        let badDocument = WrappedLibrary.Document(capturedAt: document.capturedAt, playlists: [badURL])
+        expect((try? WrappedLibrary.parse(JSONEncoder().encode(badDocument))) == nil, "Wrapped links restricted to matching Spotify playlist URLs")
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("MiniDeck-Wrapped-Test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let input = folder.appendingPathComponent("original.json")
+        let destination = folder.appendingPathComponent("private/saved.json")
+        try data.write(to: input)
+        let library = WrappedLibrary(storageURL: destination)
+        for _ in 0..<200 where library.loading { try await Task.sleep(for: .milliseconds(10)) }
+        try await library.importFile(input)
+        expect(library.yearsContaining("spotify:track:\(first.trackID)") == [2024], "Wrapped matching uses exact Spotify track ID")
+        expect(library.yearsContaining("spotify:track:\(String(repeating: "z", count: 22))").isEmpty,
+               "missing Wrapped entry is not guessed by artist or title")
+        try await library.importFile(input)
+        expect(library.playlists.count == 1, "reimport replaces a year without duplicating it")
+        let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
+        expect((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600, "saved Wrapped file has private permissions")
+        let reload = WrappedLibrary(storageURL: destination)
+        for _ in 0..<200 where reload.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(reload.playlists == library.playlists, "Wrapped snapshot reload preserves source entries")
+        try Data("corrupt".utf8).write(to: destination)
+        let damaged = WrappedLibrary(storageURL: destination)
+        for _ in 0..<200 where damaged.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(damaged.loadError, "damaged Wrapped snapshot is reported")
+        do {
+            try await damaged.importFile(input)
+            expect(false, "damaged Wrapped snapshot must not be overwritten")
+        } catch {
+            expect(try String(contentsOf: destination, encoding: .utf8) == "corrupt", "damaged Wrapped snapshot preserved")
+        }
+        try damaged.clear()
+        expect(FileManager.default.fileExists(atPath: input.path), "removing saved Wrapped leaves the original file intact")
+        expect(!FileManager.default.fileExists(atPath: destination.path), "removing saved Wrapped deletes only the saved copy")
+    } catch {
+        expect(false, "Wrapped test: \(error.localizedDescription)")
+    }
+}
+
 await checkImportPersistence()
+await checkWrapped()
 await checkPointer()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

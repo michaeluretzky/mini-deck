@@ -143,6 +143,12 @@ struct SetupView: View {
                 Text(hub.archive.coverage).font(.callout).foregroundStyle(.secondary)
             }
             if !hub.archive.message.isEmpty { Text(hub.archive.message).font(.callout).foregroundStyle(.secondary) }
+            instruction("Saved Wrapped playlists", "A Mini Deck Wrapped-playlist snapshot can add saved yearly song lists while you wait. These are playlist entries, not play counts, listening minutes or complete Wrapped summaries.")
+            HStack {
+                Button("Import Wrapped snapshot…") { hub.importWrapped() }
+                    .disabled(hub.wrapped.loading || hub.wrapped.busy)
+                Button("View saved Wrapped") { hub.showHistory(source: .wrapped) }
+            }
             Text("Only music metadata and play timing are retained. IP addresses, device details and locations are discarded. The export stays on your Mac; it is not uploaded.")
                 .font(.caption).foregroundStyle(.secondary)
             Link("Spotify: what the export includes", destination: URL(string: "https://support.spotify.com/us/article/understanding-your-data/")!)

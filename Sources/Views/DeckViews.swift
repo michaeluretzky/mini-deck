@@ -766,6 +766,23 @@ struct ListeningSection: View {
             if deck.source == .spotify {
                 Text(hub.archive.hasHistory ? "Imported Spotify history · all devices" : "Spotify account · all devices")
                     .font(.system(size: 9)).foregroundStyle(.secondary)
+                if !hub.wrapped.playlists.isEmpty {
+                    Button { hub.showHistory(source: .wrapped) } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("Saved Wrapped playlists")
+                            Spacer(minLength: 0)
+                            Text(hub.wrapped.playlists.map { String($0.year) }.joined(separator: " · "))
+                                .lineLimit(1)
+                            Image(systemName: "arrow.up.right")
+                        }.font(.system(size: 10))
+                    }.buttonStyle(.plain).foregroundStyle(deck.swatch.lead)
+                    let years = hub.wrapped.yearsContaining(deck.track.trackID)
+                    if !years.isEmpty {
+                        Text("This song appears in your saved \(years.map(String.init).joined(separator: ", ")) playlist(s).")
+                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                    }
+                }
                 if advanced {
                     Quiet(text: hub.archive.hasHistory
                           ? "Export: \(hub.archive.coverage). Plays count listens ≥30 seconds; time includes shorter listens. New plays after the export are not added to these totals."

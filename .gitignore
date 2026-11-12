@@ -21,6 +21,12 @@ dist/
 secrets*
 credentials*
 listening.json
+spotify-import.json
+wrapped*.json
+*Wrapped*.json
+Streaming_History*.json
+endsong*.json
+my_spotify_data*
 
 # Editors
 .vscode/

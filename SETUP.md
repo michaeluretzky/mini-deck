@@ -42,6 +42,12 @@ Use **Listening Stats > Import Full Spotify History…**, or the interactive gui
 
 Imported totals appear in the compact card, with additional details under **Show advanced**. The **Spotify import** tab in Listening History shows recent records and top songs/artists/albums; list displays are capped at 100 rows, but totals use all imported records.
 
+### Saved Wrapped song lists
+
+Use **Listening Stats > Import Wrapped Playlist Snapshot…** with a Mini Deck Wrapped-playlist JSON snapshot, then open **Listening History > Wrapped** and choose a saved year. This is separate from the full streaming-history importer and does not accept raw Spotify `Wrapped.json` files or screenshots. The app displays playlist order, not inferred play counts, artist ranks, listening minutes or fan percentages.
+
+Imported playlists stay private on this Mac. They are not automatically associated with a newly connected Spotify account or uploaded, and no user's playlist data is bundled in public releases. Use **Remove Saved Wrapped Snapshot…** to remove Mini Deck's copy without changing Spotify or your original file.
+
 ### Automatic import folder
 
 Choose **Setup & Help > Full account history > Choose auto-import folder…** and select a dedicated folder. Put extracted audio-history JSON files in that folder; Mini Deck imports new or changed files automatically while running and restores the selection on later launches.

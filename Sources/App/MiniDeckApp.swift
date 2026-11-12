@@ -44,6 +44,7 @@ final class Hub {
     let account = SpotifyAccount()
     let library = MusicLibrary()
     let archive = SpotifyArchive()
+    let wrapped = WrappedLibrary()
     private let historyWindow = HistoryWindow()
     private let setupWindow = SetupWindow()
     private var started = false
@@ -108,8 +109,43 @@ final class Hub {
 
     // MARK: Menu actions
 
-    func showHistory() {
-        historyWindow.show(hub: self)
+    func showHistory(source: HistorySource? = nil) {
+        historyWindow.show(hub: self, preferredSource: source)
+    }
+
+    func importWrapped() {
+        guard !wrapped.loading, !wrapped.busy else { return }
+        NSApp.activate()
+        let panel = NSOpenPanel()
+        panel.title = "Import saved Wrapped playlists"
+        panel.message = "Choose a Mini Deck Wrapped-playlist JSON snapshot. It stays private on this Mac and is separate from streaming-history totals."
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            do {
+                try await wrapped.importFile(url)
+                showHistory(source: .wrapped)
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "Wrapped snapshot was not imported"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
+    }
+
+    func clearWrapped() {
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = "Remove saved Wrapped snapshot?"
+        alert.informativeText = "Only Mini Deck's private snapshot is removed. Your Spotify playlists, full-history import and original files are unchanged."
+        alert.addButton(withTitle: "Remove Snapshot")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try wrapped.clear() }
+        catch { deck.flash("exclamationmark.triangle", "Couldn't remove Wrapped snapshot") }
     }
 
     func showSetup(step: Int? = nil) { setupWindow.show(hub: self, step: step) }
@@ -299,6 +335,13 @@ struct StatusMenu: View {
             if hub.archive.hasHistory || hub.archive.loadError != nil {
                 Button("Remove Imported Spotify History…") { hub.clearSpotifyImport() }
                     .disabled(hub.archive.busy)
+            }
+            Button("View Saved Wrapped Playlists…") { hub.showHistory(source: .wrapped) }
+            Button("Import Wrapped Playlist Snapshot…") { hub.importWrapped() }
+                .disabled(hub.wrapped.loading || hub.wrapped.busy)
+            if !hub.wrapped.playlists.isEmpty || hub.wrapped.loadError {
+                Button("Remove Saved Wrapped Snapshot…") { hub.clearWrapped() }
+                    .disabled(hub.wrapped.loading || hub.wrapped.busy)
             }
             Divider()
             switch hub.account.status {
