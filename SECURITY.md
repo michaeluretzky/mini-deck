@@ -11,6 +11,7 @@ Please report security problems privately: open this repository's **Security** t
 - **Spotify sign-in.** Uses Authorization Code with PKCE, so no client secret exists. A random `state` value is checked on return. The sign-in listener binds to `127.0.0.1` only and closes after one reply or 5 minutes.
 - **Token storage.** The Spotify refresh token is stored in the macOS login keychain (this device only). The short-lived access token stays in memory. Disconnecting deletes the keychain item.
 - **Read-only access.** The only Spotify scopes requested are `user-top-read` and `user-read-recently-played`. Mini Deck can't change your account.
-- **Play counts on this Mac.** Stored in `~/Library/Application Support/Mini Deck/listening.json`. The folder is `0700` and the file is `0600`, so only your user can read them. Turn counting off or clear it from the menu bar.
+- **Music library history.** Song names, artists, albums, play counts and last-played dates are read from the Music app on this Mac and kept in memory only. They are never saved or sent anywhere.
+- **Play counts on this Mac.** Song, artist and album names with play counts and times, stored in `~/Library/Application Support/Mini Deck/listening.json`. The folder is `0700` and the file is `0600`, so only your user can read them. Turn counting off or clear it from the menu bar.
 - **Sound bars.** Read the music app's audio level in memory. No audio is recorded or saved.
 - **Album and artist details.** Lookups send only the artist, album and song names to Apple's iTunes Search, MusicBrainz, Wikidata and Wikipedia, over HTTPS.

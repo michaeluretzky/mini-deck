@@ -1,0 +1,40 @@
+name: Build
+
+# Compiles Mini Deck for Apple silicon and Intel on every push and pull request.
+# Warnings fail the build so problems are caught before a release.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile (warnings are errors)
+        run: |
+          set -euo pipefail
+          cache="$RUNNER_TEMP/cache"
+          mkdir -p "$cache"
+          export CLANG_MODULE_CACHE_PATH="$cache"
+          for arch in arm64 x86_64; do
+            xcrun swiftc -parse-as-library -swift-version 5 -module-name MiniDeck -warnings-as-errors \
+              -target "$arch-apple-macos14.0" -module-cache-path "$cache" \
+              Sources/*/*.swift -o "$RUNNER_TEMP/MiniDeck-$arch"
+          done
+
+      - name: Build the release zip
+        run: zsh make-release.zsh
+
+      - name: Check the Music library reader
+        run: |
+          # The JavaScript that reads the Music library must at least compile.
+          script=$(awk '/let script = """/{f=1;next} /"""/{if(f){exit}} f' Sources/Stats/MusicLibrary.swift)
+          printf '%s\n' "$script" > "$RUNNER_TEMP/library.js"
+          osacompile -l JavaScript -o "$RUNNER_TEMP/library.scpt" "$RUNNER_TEMP/library.js"
+          echo "Music library script compiles."

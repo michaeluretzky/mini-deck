@@ -395,7 +395,7 @@ struct Halo: View {
             .fill(AngularGradient(colors: [swatch.lead, swatch.echo, swatch.lead], center: .center))
             .padding(Metrics.halo - 5)
             .blur(radius: 13)
-            .opacity((playing ? 0.5 : 0.28) + 0.4 * kick)
+            .opacity((playing ? Metrics.glow : Metrics.glow * 0.56) + 0.4 * kick)
             .animation(.easeOut(duration: 0.12), value: kick)
     }
 }
@@ -648,20 +648,23 @@ struct ListeningSection: View {
     var body: some View {
         let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
                                       library: hub.library, log: hub.log, counting: hub.prefs.countPlays)
-        VStack(alignment: .leading, spacing: 7) {
-            Heading(text: "Your listening")
-            ForEach(report.groups) { group in
-                VStack(alignment: .leading, spacing: 4) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .topLeading), count: 3),
-                              alignment: .leading, spacing: 6) {
-                        ForEach(group.tiles) { tile in StatCell(tile: tile, tint: deck.swatch.lead) }
-                    }
-                    Text(group.title).font(.system(size: 9)).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Heading(text: "Your listening")
+                Spacer(minLength: 0)
+                Button { hub.showHistory() } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath").font(.system(size: 10, weight: .semibold))
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(deck.swatch.lead)
+                .help("Open your full listening history")
             }
+            ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead)
+            ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead)
+            ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead)
             prompt(report.prompt)
-            if report.groups.isEmpty && report.prompt == .none {
-                Quiet(text: hub.prefs.countPlays ? "Keep listening and your stats for this song will appear here."
+            if report.isEmpty && report.prompt == .none {
+                Quiet(text: hub.prefs.countPlays ? "Keep listening and your stats for this song, artist and album will appear here."
                                                  : "Turn on Count Plays on This Mac in the menu bar to see stats here.")
             }
         }
@@ -694,6 +697,45 @@ struct ListeningSection: View {
             Quiet(text: text)
             Spacer(minLength: 0)
             Button(label) { hub.askToConnectSpotify() }.controlSize(.small)
+        }
+    }
+}
+
+/// Tiles and a short song list for one subject: the song, the artist or the album.
+struct ScopeBlock: View {
+    let title: String
+    let scope: StatScope
+    let tint: Color
+
+    var body: some View {
+        if !scope.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.primary.opacity(0.85))
+                if !scope.tiles.isEmpty {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .topLeading), count: 3),
+                              alignment: .leading, spacing: 6) {
+                        ForEach(Array(scope.tiles.enumerated()), id: \.offset) { item in StatCell(tile: item.element, tint: tint) }
+                    }
+                }
+                if !scope.lines.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(scope.linesTitle).font(.system(size: 9.5)).foregroundStyle(.secondary)
+                        ForEach(Array(scope.lines.enumerated()), id: \.offset) { i, line in
+                            HStack(spacing: 6) {
+                                Text("\(i + 1)").font(.system(size: 10, weight: .bold, design: .rounded).monospacedDigit())
+                                    .foregroundStyle(tint).frame(width: 12, alignment: .trailing)
+                                Text(line.title).font(.system(size: 11)).lineLimit(1)
+                                Spacer(minLength: 4)
+                                Text(line.detail).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.04), in: .rect(cornerRadius: 7, style: .continuous))
+                }
+                Text(scope.caption).font(.system(size: 9)).foregroundStyle(.tertiary)
+            }
         }
     }
 }

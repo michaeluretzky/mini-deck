@@ -41,6 +41,18 @@ final class SpotifyAccount {
         let trackID: String
         let artistKeys: [String]
         let at: Date
+        var title = ""
+        var artist = ""
+        var album = ""
+    }
+
+    /// One row of a top list, in Spotify's order.
+    struct Ranked: Equatable, Sendable {
+        let title: String
+        let subtitle: String
+        var id = ""
+        var artistKeys: [String] = []
+        var album = ""
     }
 
     static let port: UInt16 = 8974
@@ -50,6 +62,9 @@ final class SpotifyAccount {
     private(set) var status: Status = .off
     private(set) var top: [Span: Top] = [:]
     private(set) var recent: [Play] = []
+    /// Ordered top lists for the history window.
+    private(set) var topSongs: [Span: [Ranked]] = [:]
+    private(set) var topArtists: [Span: [Ranked]] = [:]
     private(set) var updated: Date?
 
     @ObservationIgnored var onNotice: ((String) -> Void)?
@@ -126,6 +141,8 @@ final class SpotifyAccount {
         access = nil
         top = [:]
         recent = []
+        topSongs = [:]
+        topArtists = [:]
         updated = nil
         topFetched = .distantPast
         recentFetched = .distantPast
@@ -194,29 +211,40 @@ final class SpotifyAccount {
 
         if wantTop {
             var fresh: [Span: Top] = [:]
+            var songs: [Span: [Ranked]] = [:]
+            var artists: [Span: [Ranked]] = [:]
             for span in Span.allCases {
                 var t = Top()
                 if let a = await get("/me/top/artists?time_range=\(span.rawValue)&limit=50", Paging<WebArtist>.self) {
                     for (i, artist) in a.items.enumerated() where t.artists[TitleTidy.key(artist.name)] == nil {
                         t.artists[TitleTidy.key(artist.name)] = i + 1
                     }
+                    artists[span] = a.items.map { Ranked(title: $0.name, subtitle: "") }
                 }
                 if let s = await get("/me/top/tracks?time_range=\(span.rawValue)&limit=50", Paging<WebTrack>.self) {
                     for (i, track) in s.items.enumerated() {
                         if let id = track.id { t.tracks[id] = i + 1 }
+                    }
+                    songs[span] = s.items.map {
+                        Ranked(title: $0.name, subtitle: Self.names($0.artists), id: $0.id ?? "",
+                               artistKeys: $0.artists.map { TitleTidy.key($0.name) }, album: $0.album?.name ?? "")
                     }
                 }
                 guard status == .on else { return }
                 fresh[span] = t
             }
             top = fresh
+            topSongs = songs
+            topArtists = artists
             topFetched = now
         }
         if wantRecent || wantTop, let r = await get("/me/player/recently-played?limit=50", Paging<WebPlay>.self) {
             recent = r.items.compactMap { item in
                 guard let id = item.track.id else { return nil }
                 return Play(trackID: id, artistKeys: item.track.artists.map { TitleTidy.key($0.name) },
-                            at: Self.parseDate(item.played_at) ?? .distantPast)
+                            at: Self.parseDate(item.played_at) ?? .distantPast,
+                            title: item.track.name, artist: Self.names(item.track.artists),
+                            album: item.track.album?.name ?? "")
             }
             recentFetched = now
         }
@@ -338,6 +366,10 @@ final class SpotifyAccount {
         return diff == 0
     }
 
+    nonisolated static func names(_ artists: [WebArtist]) -> String {
+        artists.map(\.name).joined(separator: ", ")
+    }
+
     nonisolated static func parseDate(_ s: String) -> Date? {
         let withFraction = ISO8601DateFormatter()
         withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -350,7 +382,8 @@ final class SpotifyAccount {
 
 struct Paging<T: Decodable & Sendable>: Decodable, Sendable { let items: [T] }
 struct WebArtist: Decodable, Sendable { let id: String?; let name: String }
-struct WebTrack: Decodable, Sendable { let id: String?; let name: String; let artists: [WebArtist] }
+struct WebAlbum: Decodable, Sendable { let id: String?; let name: String }
+struct WebTrack: Decodable, Sendable { let id: String?; let name: String; let artists: [WebArtist]; let album: WebAlbum? }
 struct WebPlay: Decodable, Sendable { let track: WebTrack; let played_at: String }
 
 // MARK: - Keychain

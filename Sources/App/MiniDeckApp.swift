@@ -42,6 +42,7 @@ final class Hub {
     let log = ListeningLog()
     let account = SpotifyAccount()
     let library = MusicLibrary()
+    private let historyWindow = HistoryWindow()
     private var started = false
 
     func start() {
@@ -86,6 +87,16 @@ final class Hub {
     }
 
     // MARK: Menu actions
+
+    func showHistory() {
+        historyWindow.show(hub: self)
+    }
+
+    /// Fetches fresh history when the history window opens or changes source.
+    func refreshHistory() {
+        Task { await account.update(trackChanged: true) }
+        library.scanIfStale()
+    }
 
     func choose(_ choice: SourceChoice) {
         prefs.choice = choice
@@ -191,7 +202,7 @@ final class Prefs {
 
     init() {
         let store = UserDefaults.standard
-        soundBars = store.object(forKey: PrefKey.soundBars) as? Bool ?? true
+        soundBars = store.object(forKey: PrefKey.soundBars) as? Bool ?? Metrics.soundBarsOn
         choice = store.string(forKey: PrefKey.choice).flatMap(SourceChoice.init(rawValue:)) ?? .automatic
         countPlays = store.object(forKey: PrefKey.countPlays) as? Bool ?? true
         openAtLogin = SMAppService.mainApp.status == .enabled
@@ -226,6 +237,8 @@ struct StatusMenu: View {
             }
         }
         Divider()
+        Button("Listening History…") { hub.showHistory() }
+            .keyboardShortcut("y")
         Menu("Listening Stats") {
             switch hub.account.status {
             case .on:

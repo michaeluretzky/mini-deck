@@ -36,16 +36,25 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 - Rest the pointer on the cover to see:
   1. **About this song & album:** short summaries, release year, song count, length, genre.
   2. **About the artist or band:** origin, years active or born, genres, short bio.
-  3. **Your listening:** your own stats for the song and artist (see below).
+  3. **Your listening:** your own history with this song, this artist and this album (see below).
+- **Listening History** window (menu bar > Listening History, or ⌘Y): your recent plays, top songs, top artists and top albums.
 - Follows whichever app is playing, or one app you choose (menu bar > Follow).
 
 ## Your listening stats
 
-| Source | What you see | Setup |
+Rest the pointer on the cover. "Your listening" shows three parts:
+
+- **This song:** plays, last played, top-song rank, favorite, date added.
+- **This artist:** top-artist rank, total plays, songs played, last played, when you first heard them, and your top 3 songs by them.
+- **This album:** album plays, songs played (for example 7/12), last played, and your top songs on the album.
+
+| Source | Where the numbers come from | Setup |
 | --- | --- | --- |
-| Spotify account | Top-artist and top-song rank (4 weeks, 6 months, 12 months), plays in your last 50 | Connect once (below) |
-| Apple Music library | Song play count, last played, favorite, date added, artist plays, artist rank, songs in library | None |
-| This Mac | Plays and listening time Mini Deck counted for the song and artist | None. Can be turned off |
+| Spotify account | Your top 50 songs and artists (4 weeks, 6 months, 12 months) and your last 50 plays on any device | Connect once (below) |
+| Apple Music library | Play counts and last-played dates the Music app keeps for every song | None |
+| This Mac | Plays and listening time Mini Deck counts while it runs, for both apps | None. Can be turned off |
+
+The **Listening History** window has the same three sources, each with Recent, Top Songs, Top Artists and Top Albums lists. Spotify doesn't offer a top-albums list, so Mini Deck ranks albums by how many of your top songs they hold.
 
 ### Connect Spotify
 

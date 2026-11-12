@@ -9,6 +9,8 @@ final class ListeningLog {
     struct Song: Codable, Equatable {
         var title: String
         var artist: String
+        /// Added in 1.2; older saved songs have none until heard again.
+        var album: String? = nil
         var plays = 0
         var seconds: Double = 0
         var first: Date
@@ -79,6 +81,7 @@ final class ListeningLog {
         var artist = book.artists[artistKey] ?? Artist(name: snap.primaryArtist, first: now)
         song.seconds += delta
         song.last = now
+        if !snap.album.isEmpty { song.album = snap.album }
         artist.seconds += delta
         if !counted && heard >= Self.playThreshold {
             counted = true
@@ -106,6 +109,63 @@ final class ListeningLog {
     }
 
     var isEmpty: Bool { book.songs.isEmpty }
+
+    // MARK: Artist and album history
+
+    func songs(byArtist name: String) -> [Song] {
+        let key = Self.artistKey(name)
+        guard !key.isEmpty else { return [] }
+        return book.songs.values.filter { TitleTidy.key($0.artist) == key }
+    }
+
+    func songs(onAlbum album: String, artists: [String]) -> [Song] {
+        let albumKey = TitleTidy.key(album)
+        let keys = Set(artists.map(TitleTidy.key).filter { !$0.isEmpty })
+        guard !albumKey.isEmpty else { return [] }
+        return book.songs.values.filter { song in
+            guard let a = song.album, TitleTidy.key(a) == albumKey else { return false }
+            return keys.isEmpty || keys.contains(TitleTidy.key(song.artist))
+        }
+    }
+
+    // MARK: History lists
+
+    /// Songs by when you last heard them here, newest first. Only songs that reached a full play.
+    func recentSongs(limit: Int = 50) -> [Song] {
+        Array(book.songs.values.filter { $0.plays > 0 }.sorted { $0.last > $1.last }.prefix(limit))
+    }
+
+    /// Songs by plays, then listening time.
+    func topSongs(limit: Int = 50) -> [Song] {
+        Array(book.songs.values.filter { $0.plays > 0 }
+            .sorted { $0.plays != $1.plays ? $0.plays > $1.plays : $0.seconds > $1.seconds }
+            .prefix(limit))
+    }
+
+    struct AlbumTotal: Equatable {
+        let album: String
+        let artist: String
+        let plays: Int
+        let seconds: Double
+    }
+
+    /// Albums by listening time, from songs heard since 1.2 (older entries have no album).
+    func topAlbums(limit: Int = 50) -> [AlbumTotal] {
+        var albums: [String: AlbumTotal] = [:]
+        for song in book.songs.values {
+            guard let album = song.album, !TitleTidy.key(album).isEmpty else { continue }
+            let key = TitleTidy.key(album) + "/" + TitleTidy.key(song.artist)
+            let old = albums[key]
+            albums[key] = AlbumTotal(album: old?.album ?? album, artist: old?.artist ?? song.artist,
+                                     plays: (old?.plays ?? 0) + song.plays, seconds: (old?.seconds ?? 0) + song.seconds)
+        }
+        return Array(albums.values.filter { $0.seconds >= 60 }.sorted { $0.seconds > $1.seconds }.prefix(limit))
+    }
+
+    /// Artists by listening time.
+    func topArtists(limit: Int = 50) -> [Artist] {
+        Array(book.artists.values.filter { $0.seconds >= 60 }.sorted { $0.seconds > $1.seconds }.prefix(limit))
+    }
 
     // MARK: Storage
 

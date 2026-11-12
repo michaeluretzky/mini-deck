@@ -5,11 +5,15 @@ import AppKit
 import SwiftUI
 
 enum Metrics {
-    static let card: CGFloat = 372
+    // Design settings
+    static let card: CGFloat = 448        // card width
+    static let cover: CGFloat = 132       // album art side
+    static let corner: CGFloat = 16       // card corner radius
+    static let inset: CGFloat = 12        // card padding
+    static let glow: Double = 0.5         // glow opacity while playing
+    static let soundBarsOn = true         // sound bars default
+
     static let halo: CGFloat = 20
-    static let cover: CGFloat = 116
-    static let corner: CGFloat = 16
-    static let inset: CGFloat = 12
     static let screenGap: CGFloat = 10
     static let pull: CGFloat = 20
     static var panelWidth: CGFloat { card + halo * 2 }
