@@ -39,6 +39,13 @@ xcrun swiftc -O -target "$host" -module-cache-path "$work/cache" "$root/Tools/Ma
 iconutil -c icns "$work/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
 
 cp "$root/Info.plist" "$app/Contents/Info.plist"
+if [[ -n "${MINIDECK_SPOTIFY_CLIENT_ID:-}" ]]; then
+  if ! [[ "$MINIDECK_SPOTIFY_CLIENT_ID" =~ '^[a-fA-F0-9]{32}$' ]]; then
+    print "MINIDECK_SPOTIFY_CLIENT_ID must be a 32-character public Client ID, not a secret."
+    exit 1
+  fi
+  /usr/libexec/PlistBuddy -c "Add :MiniDeckSpotifyClientID string $MINIDECK_SPOTIFY_CLIENT_ID" "$app/Contents/Info.plist"
+fi
 cp "$root/LICENSE" "$app/Contents/Resources/LICENSE.txt"
 print -n "APPL????" > "$app/Contents/PkgInfo"
 

@@ -5,11 +5,12 @@ import AppKit
 import SwiftUI
 
 enum HistorySource: String, CaseIterable, Identifiable {
-    case spotify, music, mac
+    case spotify, archive, music, mac
     var id: String { rawValue }
     var title: String {
         switch self {
         case .spotify: "Spotify"
+        case .archive: "Spotify import"
         case .music: "Apple Music"
         case .mac: "This Mac"
         }
@@ -59,6 +60,7 @@ enum HistoryBook {
         var page: HistoryPage
         switch source {
         case .spotify: page = spotify(list, span: span, account: hub.account)
+        case .archive: page = imported(list, archive: hub.archive)
         case .music: page = music(list, library: hub.library)
         case .mac: page = mac(list, log: hub.log, counting: hub.prefs.countPlays)
         }
@@ -108,6 +110,43 @@ enum HistoryBook {
             }
             page.note = "Albums ranked by how many of your top 50 songs (last \(span.label)) they hold."
         }
+        return page
+    }
+
+    private static func imported(_ list: HistoryList, archive: SpotifyArchive) -> HistoryPage {
+        var page = HistoryPage()
+        guard archive.hasHistory else {
+            page.empty = archive.busy || archive.loading ? .loading
+                : .message("Import Spotify's Extended Streaming History to see account-wide history from every device. Choose the extracted JSON files using Import below.")
+            return page
+        }
+        let snapshot = archive.snapshot
+        if list == .recent {
+            page.rows = snapshot.events.suffix(100).reversed().map {
+                HistoryRow(rank: nil, title: $0.title, subtitle: $0.artist,
+                           detail: "\(Int($0.milliseconds / 1000)) sec · \(StatsBook.ago($0.ended))")
+            }
+        } else {
+            let totals: [SpotifyArchive.Total]
+            switch list {
+            case .songs: totals = Array(snapshot.songs.values)
+            case .artists: totals = Array(snapshot.artists.values)
+            case .albums: totals = Array(snapshot.albums.values)
+            case .recent: totals = []
+            }
+            page.rows = totals.sorted {
+                if $0.plays != $1.plays { return $0.plays > $1.plays }
+                if $0.milliseconds != $1.milliseconds { return $0.milliseconds > $1.milliseconds }
+                return $0.title < $1.title
+            }.prefix(100).enumerated().map {
+                let item = $0.element
+                return HistoryRow(rank: $0.offset + 1,
+                    title: list == .artists ? item.artist : (list == .albums ? item.album : item.title),
+                    subtitle: list == .artists ? "" : item.artist,
+                    detail: "\(item.plays) plays · \(item.seconds < 60 ? "\(Int(item.seconds)) sec" : StatsBook.duration(item.seconds))")
+            }
+        }
+        page.note = "\(snapshot.events.count) imported music records · \(archive.coverage) · all devices. Showing up to 100 rows. Plays require ≥30 seconds; time includes shorter listens. Totals are limited to the files imported and do not include later API plays."
         return page
     }
 
@@ -235,12 +274,22 @@ struct HistoryView: View {
                     .listStyle(.inset(alternatesRowBackgrounds: true))
             }
 
+            if source == .archive {
+                HStack {
+                    Button(hub.archive.busy ? "Importing…" : "Import Spotify History…") { hub.importSpotifyHistory() }
+                        .disabled(hub.archive.busy || hub.archive.loading)
+                    Link("Request extended history", destination: URL(string: "https://www.spotify.com/account/privacy/")!)
+                }
+                if !hub.archive.message.isEmpty {
+                    Text(hub.archive.message).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+            }
             if !page.note.isEmpty {
                 Text(page.note).font(.system(size: 10.5)).foregroundStyle(.secondary)
             }
         }
         .padding(14)
-        .frame(minWidth: 440, minHeight: 420)
+        .frame(minWidth: 520, minHeight: 420)
         .onAppear { hub.refreshHistory() }
         .onChange(of: source) { hub.refreshHistory() }
     }
@@ -316,7 +365,7 @@ final class HistoryWindow {
                              backing: .buffered, defer: false)
             w.title = "Listening History"
             w.isReleasedWhenClosed = false
-            let picks = HistoryPicks(source: hub.deck.source == .music ? .music : .spotify)
+            let picks = HistoryPicks(source: hub.deck.source == .music ? .music : (hub.archive.hasHistory ? .archive : .spotify))
             w.contentView = NSHostingView(rootView: HistoryView(hub: hub, picks: picks))
             w.setFrameAutosaveName("MiniDeckHistory")
             if !w.setFrameUsingName("MiniDeckHistory") { w.center() }

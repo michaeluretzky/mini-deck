@@ -603,7 +603,29 @@ struct ArtistSection: View {
     var body: some View {
         let p = deck.albumNotes?.artist
         VStack(alignment: .leading, spacing: 6) {
-            Heading(text: p?.kind == .band ? "About the band" : "About the artist")
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Heading(text: p?.kind == .band ? "About the band" : "About the artist")
+                Spacer(minLength: 4)
+                if let audience = deck.audience, let count = audience.monthlyListeners {
+                    Link("\(count) /mo · Spotify", destination: audience.url)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(deck.swatch.lead)
+                        .lineLimit(1)
+                        .help("Spotify monthly listeners from the public artist page, checked \(audience.checked.formatted()). This is the artist's audience, not your personal plays.")
+                } else if deck.source == .spotify {
+                    Link(destination: deck.audience?.url ?? p?.spotifyURL ?? spotifySearch) {
+                        Label("Monthly listeners", systemImage: "arrow.up.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(deck.swatch.lead)
+                    .help("Open Spotify's public artist page. A number is shown here only when the page supplies verifiable audience metadata; the Web API does not provide it.")
+                } else {
+                    Text("Listeners not public")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .help("Apple Music does not expose an artist monthly-listener count through its public artist API.")
+                }
+            }
             Text(p?.name ?? deck.creditedArtist)
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
@@ -635,6 +657,12 @@ struct ArtistSection: View {
         case .other: return "Since \(began)"
         }
     }
+
+    private var spotifySearch: URL {
+        var url = URLComponents(string: "https://open.spotify.com/search/")!
+        url.path += deck.creditedArtist
+        return url.url!
+    }
 }
 
 /// 3. The user's own listening numbers.
@@ -644,11 +672,11 @@ struct ListeningSection: View {
 
     var body: some View {
         let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
-                                      library: hub.library, log: hub.log, counting: hub.prefs.countPlays)
+                                      library: hub.library, archive: hub.archive)
         VStack(alignment: .leading, spacing: 8) {
             let advanced = hub.prefs.statsAdvanced
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Heading(text: "Your listening")
+                Heading(text: deck.source == .spotify ? "Your Spotify listening" : "Your Music library")
                 Spacer(minLength: 0)
                 if !report.isEmpty {
                     Button { hub.prefs.statsAdvanced.toggle() } label: {
@@ -668,16 +696,31 @@ struct ListeningSection: View {
                 .help("Open your full listening history")
             }
             if advanced {
-                ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead)
-                ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead)
-                ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead)
+                let empty = deck.source == .spotify ? "Not present in the available Spotify history." : ""
+                ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead, emptyText: empty)
+                ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead, emptyText: empty)
+                ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead, emptyText: empty)
             } else if !report.isEmpty {
                 SummaryRow(report: report, tint: deck.swatch.lead)
             }
+            if deck.source == .spotify {
+                Text(hub.archive.hasHistory ? "Imported Spotify history · all devices" : "Spotify account · all devices")
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
+                if advanced {
+                    Quiet(text: hub.archive.hasHistory
+                          ? "Export: \(hub.archive.coverage). Plays count listens ≥30 seconds; time includes shorter listens. New plays after the export are not added to these totals."
+                          : "Live API: top 50 rankings and last 50 plays, not lifetime totals. Import Extended Streaming History for full-account totals.")
+                    Button(hub.archive.busy ? "Importing…" : "Import full Spotify history…") { hub.importSpotifyHistory() }
+                        .buttonStyle(.plain).font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(deck.swatch.lead)
+                        .disabled(hub.archive.busy || hub.archive.loading)
+                }
+            }
             prompt(report.prompt)
             if report.isEmpty && report.prompt == .none {
-                Quiet(text: hub.prefs.countPlays ? "Keep listening and your stats for this song, artist and album will appear here."
-                                                 : "Turn on Count Plays on This Mac in the menu bar to see stats here.")
+                Quiet(text: deck.source == .spotify
+                      ? "No matching data in the available Spotify history. This does not mean you've never played it."
+                      : "No matching play history in your Music library.")
             }
         }
     }
@@ -757,6 +800,7 @@ struct ScopeBlock: View {
     let title: String
     let scope: StatScope
     let tint: Color
+    var emptyText = ""
 
     var body: some View {
         if !scope.isEmpty {
@@ -786,6 +830,11 @@ struct ScopeBlock: View {
                     .background(Color.white.opacity(0.04), in: .rect(cornerRadius: 7, style: .continuous))
                 }
                 Text(scope.caption).font(.system(size: 9)).foregroundStyle(.tertiary)
+            }
+        } else if !emptyText.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 10.5, weight: .semibold))
+                Quiet(text: emptyText)
             }
         }
     }

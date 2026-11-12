@@ -59,6 +59,14 @@ final class SpotifyAccount {
     static let redirect = "http://127.0.0.1:8974/callback"
     static let scopes = "user-top-read user-read-recently-played"
 
+    /// Optional distributor configuration. A Client ID is public, never a
+    /// secret. The distributor must obtain appropriate Spotify access first.
+    static var bundledClientID: String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "MiniDeckSpotifyClientID") as? String,
+              looksLikeClientID(value) else { return nil }
+        return value
+    }
+
     private(set) var status: Status = .off
     private(set) var top: [Span: Top] = [:]
     private(set) var recent: [Play] = []
@@ -84,6 +92,19 @@ final class SpotifyAccount {
     }
 
     var isConnected: Bool { status == .on }
+
+    /// Resolve the credited artist using Spotify IDs, not a name-only search.
+    func audience(for track: Snapshot, creditedArtist: String) async -> ArtistAudience? {
+        guard status == .on else { return nil }
+        let parts = track.trackID.split(separator: ":")
+        guard parts.count == 3, parts[0] == "spotify", parts[1] == "track" else { return nil }
+        let id = String(parts[2])
+        guard id.count == 22, id.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }),
+              let song = await get("/tracks/\(id)", WebTrack.self),
+              let artist = song.artists.first(where: { TitleTidy.key($0.name) == TitleTidy.key(creditedArtist) }),
+              let artistID = artist.id, let url = AudiencePages.artistURL(id: artistID) else { return nil }
+        return await AudiencePages.shared.read(artist: creditedArtist, url: url)
+    }
 
     // MARK: Sign-in
 

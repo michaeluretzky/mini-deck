@@ -3,6 +3,7 @@
 
 import ServiceManagement
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct MiniDeckApp: App {
@@ -42,8 +43,11 @@ final class Hub {
     let log = ListeningLog()
     let account = SpotifyAccount()
     let library = MusicLibrary()
+    let archive = SpotifyArchive()
     private let historyWindow = HistoryWindow()
+    private let setupWindow = SetupWindow()
     private var started = false
+    private var accountRefreshTask: Task<Void, Never>?
 
     func start() {
         guard !started else { return }
@@ -60,11 +64,27 @@ final class Hub {
         deck.pixelScale = stage.scale
         deck.start()
         followPlayback()
+        accountRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(120))
+                guard !Task.isCancelled, let self else { return }
+                await self.account.update(trackChanged: true)
+            }
+        }
+        if !UserDefaults.standard.bool(forKey: "minideck.setupShown") {
+            UserDefaults.standard.set(true, forKey: "minideck.setupShown")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showSetup() }
+        }
     }
 
     private func trackChanged(_ snap: Snapshot) {
         switch snap.source {
-        case .spotify: Task { await account.update(trackChanged: true) }
+        case .spotify:
+            Task {
+                await account.update(trackChanged: true)
+                let value = await account.audience(for: snap, creditedArtist: deck.creditedArtist)
+                deck.applyAudience(value, for: snap)
+            }
         case .music: library.scanIfStale()
         }
     }
@@ -92,6 +112,26 @@ final class Hub {
         historyWindow.show(hub: self)
     }
 
+    func showSetup(step: Int? = nil) { setupWindow.show(hub: self, step: step) }
+
+    func chooseAutoImportFolder() {
+        NSApp.activate()
+        let panel = NSOpenPanel()
+        panel.title = "Automatically import Spotify exports"
+        panel.message = "Choose a dedicated folder for extracted Spotify history JSON files. Mini Deck will check only this selected folder every 30 seconds and deduplicate new imports. ZIP files must be extracted first."
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try archive.watchFolder(url) }
+        catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't watch this folder"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
     /// Fetches fresh history when the history window opens or changes source.
     func refreshHistory() {
         Task { await account.update(trackChanged: true) }
@@ -109,6 +149,45 @@ final class Hub {
         log.enabled = on
     }
 
+    func importSpotifyHistory() {
+        guard !archive.busy, !archive.loading else { return }
+        NSApp.activate()
+        let panel = NSOpenPanel()
+        panel.title = "Import Spotify Extended Streaming History"
+        panel.message = "Unzip Spotify's export first. Select all Streaming_History_Audio JSON files (or their folder). Imported data stays on this Mac."
+        panel.allowedContentTypes = [.json, .folder]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+        let urls = panel.urls
+        Task {
+            do {
+                try await archive.importFiles(urls)
+                deck.flash("checkmark.circle", "Spotify history imported")
+                showHistory()
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "Spotify history was not imported"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
+    }
+
+    func clearSpotifyImport() {
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = "Remove imported Spotify history?"
+        alert.informativeText = "Only Mini Deck's sanitized import is deleted. Your original export, Spotify account, and Mac-only history are unchanged."
+        alert.addButton(withTitle: "Remove Import")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { archive.stopWatching(); try archive.clear() }
+        catch { deck.flash("exclamationmark.triangle", "Couldn't remove the import") }
+    }
+
     func confirmClearHistory() {
         NSApp.activate()
         let alert = NSAlert()
@@ -123,58 +202,10 @@ final class Hub {
         }
     }
 
-    /// Asks for the Client ID of the user's own Spotify developer app, then opens Spotify's sign-in page.
+    /// The guided flow reuses a bundled registration when available, with a
+    /// complete manual fallback and no unsolicited clipboard reads.
     func askToConnectSpotify() {
-        NSApp.activate()
-        let alert = NSAlert()
-        alert.messageText = "Connect your Spotify account"
-        alert.informativeText = """
-        Mini Deck reads your top artists, top songs and recent plays. It can't change your account or play anything.
-
-        1. Open the Spotify Developer Dashboard and create an app with any name.
-        2. Add this Redirect URI: \(SpotifyAccount.redirect)
-        3. Select "Web API", save, and paste the app's Client ID below.
-
-        Your sign-in is kept in your Mac's keychain. Mini Deck talks only to Spotify.
-        """
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.placeholderString = "Client ID"
-        if let clip = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           SpotifyAccount.looksLikeClientID(clip) {
-            field.stringValue = clip
-        }
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Connect")
-        alert.addButton(withTitle: "Open Dashboard")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-
-        // A menu bar app has no Edit menu, so wire up the usual editing keys for the field.
-        let keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
-            let action: Selector? = switch key {
-            case "v": #selector(NSText.paste(_:))
-            case "c": #selector(NSText.copy(_:))
-            case "x": #selector(NSText.cut(_:))
-            case "a": #selector(NSText.selectAll(_:))
-            default: nil
-            }
-            guard let action else { return event }
-            return NSApp.sendAction(action, to: nil, from: nil) ? nil : event
-        }
-        let answer = alert.runModal()
-        if let keys { NSEvent.removeMonitor(keys) }
-
-        switch answer {
-        case .alertFirstButtonReturn:
-            account.connect(clientID: field.stringValue)
-        case .alertSecondButtonReturn:
-            if let url = URL(string: "https://developer.spotify.com/dashboard") { NSWorkspace.shared.open(url) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.askToConnectSpotify() }
-        default:
-            break
-        }
+        showSetup(step: 2)
     }
 }
 
@@ -244,7 +275,22 @@ struct StatusMenu: View {
         Divider()
         Button("Listening History…") { hub.showHistory() }
             .keyboardShortcut("y")
+        Button("Setup & Help…") { hub.showSetup() }
         Menu("Listening Stats") {
+            Button(hub.archive.busy ? "Importing Spotify History…" : "Import Full Spotify History…") { hub.importSpotifyHistory() }
+                .disabled(hub.archive.busy || hub.archive.loading)
+            Button("Request Spotify Extended History…") {
+                NSWorkspace.shared.open(URL(string: "https://www.spotify.com/account/privacy/")!)
+            }
+            Button("Auto-import Spotify Export Folder…") { hub.chooseAutoImportFolder() }
+            if hub.archive.watchedFolderName != nil {
+                Button("Stop Automatic Imports") { hub.archive.stopWatching() }
+            }
+            if hub.archive.hasHistory {
+                Button("Remove Imported Spotify History…") { hub.clearSpotifyImport() }
+                    .disabled(hub.archive.busy)
+            }
+            Divider()
             switch hub.account.status {
             case .on:
                 Text("Spotify account connected")

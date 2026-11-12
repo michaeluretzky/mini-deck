@@ -13,6 +13,7 @@ struct ArtistProfile: Equatable, Sendable {
     var ended: String?
     var genres: [String] = []
     var summary: String?
+    var spotifyURL: URL?
     var hasFacts: Bool { origin != nil || began != nil || !genres.isEmpty }
 }
 
@@ -32,7 +33,7 @@ struct AlbumNotes: Equatable, Sendable {
 /// Apple's iTunes Search, MusicBrainz, Wikidata and Wikipedia.
 actor LinerNotesService {
     static let shared = LinerNotesService()
-    static let agent = "MiniDeck/1.3.4 ( https://github.com/michaeluretzky/mini-deck )"
+    static let agent = "MiniDeck/1.4.0 ( https://github.com/michaeluretzky/mini-deck )"
 
     private var albums: [String: AlbumNotes?] = [:]
     private var songs: [String: String?] = [:]
@@ -161,6 +162,8 @@ actor LinerNotesService {
         let links: [(kind: String, url: String)] = (detail.relations ?? []).compactMap { r in
             r.url.map { (r.type, $0.resource) }
         }
+        profile.spotifyURL = links.compactMap { URL(string: $0.url) }
+            .first { AudiencePages.artistID($0) != nil }
         var page: String?
         if let wikidata = links.first(where: { $0.kind == "wikidata" })?.url,
            let qid = wikidata.split(separator: "/").last {

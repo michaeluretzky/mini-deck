@@ -28,6 +28,7 @@ final class Deck {
     private(set) var swatch = Swatch.fallback
     private(set) var notes: NotesState = .idle
     private(set) var songNote: String?
+    private(set) var audience: ArtistAudience?
     private(set) var hud: HUDMessage?
     private(set) var volume: Double = 50
     private(set) var anchorPosition: Double = 0
@@ -77,6 +78,13 @@ final class Deck {
         return min(anchorPosition + running, track.length)
     }
 
+    func applyAudience(_ value: ArtistAudience?, for snapshot: Snapshot) {
+        guard snapshot.source == track.source, snapshot.trackID == track.trackID,
+              snapshot.artist == track.artist, snapshot.albumArtist == track.albumArtist,
+              let value, TitleTidy.key(value.artist) == TitleTidy.key(creditedArtist) else { return }
+        audience = value
+    }
+
     // MARK: Reading the music apps
 
     func start() {
@@ -117,6 +125,9 @@ final class Deck {
             return
         }
         let newTrack = snap.title != track.title || snap.artist != track.artist || snap.source != track.source
+        if snap.artist != track.artist || snap.albumArtist != track.albumArtist || snap.source != track.source {
+            audience = nil
+        }
         if snap != track { track = snap }
         let now = Date()
         if now > seekHold {
@@ -165,6 +176,11 @@ final class Deck {
                 let found = await LinerNotesService.shared.album(artist: credit, title: album)
                 guard let self, !Task.isCancelled, self.albumKey == aKey else { return }
                 self.notes = found.map { .found($0) } ?? .empty
+                if self.audience == nil, let url = found?.artist?.spotifyURL {
+                    let audience = await AudiencePages.shared.read(artist: credit, url: url)
+                    guard !Task.isCancelled, self.albumKey == aKey else { return }
+                    self.applyAudience(audience, for: s)
+                }
                 if self.track.source == .music, self.cover == nil, !self.decoding, let art = found?.artworkURL {
                     self.coverURL = art
                     self.loadCover(art)

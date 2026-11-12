@@ -56,8 +56,7 @@ MainActor.assumeIsolated {
         track.album = "First Album"
         track.albumArtist = "The Band"
         let facts = LibraryFacts(plays: 10, skips: 1, lastPlayed: Date(timeIntervalSince1970: now - day), added: nil, favorite: true)
-        let report = StatsBook.report(track: track, facts: facts, account: SpotifyAccount(), library: library,
-                                      log: ListeningLog(), counting: false)
+        let report = StatsBook.report(track: track, facts: facts, account: SpotifyAccount(), library: library)
         expect(report.song.tiles.count == 3, "song row holds 3 tiles")
         expect(report.song.tiles.first?.value == "10", "song plays tile")
         expect(report.artist.tiles.first?.value == "14", "artist plays tile")
@@ -96,6 +95,80 @@ MainActor.assumeIsolated {
     expect(log.recentSongs().first?.title == "Night Drive", "recent songs")
     expect(log.topArtists().first?.name == "Neon Coast", "top artists from this Mac")
     log.clear()
+
+    // MARK: Account-only live stats and full-history import
+
+    var remoteTrack = Snapshot()
+    remoteTrack.source = .spotify
+    remoteTrack.title = "Across Devices"
+    remoteTrack.artist = "The Band"
+    remoteTrack.albumArtist = "The Band"
+    remoteTrack.album = "Account Album"
+    remoteTrack.trackID = "spotify:track:0123456789012345678901"
+    let remotePlays = [
+        SpotifyAccount.Play(trackID: "0123456789012345678901", artistKeys: [TitleTidy.key("The Band")],
+                            at: Date(), title: "Across Devices", artist: "The Band", album: "Account Album"),
+        SpotifyAccount.Play(trackID: "other", artistKeys: [TitleTidy.key("Other Artist")],
+                            at: Date(), title: "Different", artist: "Other Artist", album: "Account Album")
+    ]
+    let remote = StatsBook.spotifyReport(track: remoteTrack, top: [.medium: .init(artists: [TitleTidy.key("The Band"): 48])],
+                                        recent: remotePlays, rankedSongs: [:])
+    expect(remote.song.tiles.first?.value == "1×", "account recent play displayed")
+    expect(remote.album.tiles.first?.value == "1", "same-name album from another artist excluded")
+    expect(remote.artist.tiles.first?.value == "#48", "account artist rank preserved")
+    expect(remote.song.caption == StatsBook.spotifyLabel, "account source explicitly covers all devices")
+    expect([remote.song, remote.artist, remote.album].flatMap(\.tiles).allSatisfy { !$0.caption.contains("here") },
+           "live account card has no device-local metrics")
+    let absent = StatsBook.spotifyReport(track: remoteTrack, top: [:], recent: [], rankedSongs: [:])
+    expect(absent.isEmpty, "missing history is not mislabeled New or zero lifetime plays")
+
+    let extended = """
+    [
+      {"ts":"2020-01-01T12:00:00Z","ms_played":180000,"master_metadata_track_name":"Across Devices","master_metadata_album_artist_name":"The Band","master_metadata_album_album_name":"Account Album","spotify_track_uri":"spotify:track:0123456789012345678901","ip_addr":"PRIVATE","platform":"phone"},
+      {"ts":"2020-01-02T12:00:00.000Z","ms_played":10000,"master_metadata_track_name":"Across Devices","master_metadata_album_artist_name":"The Band","master_metadata_album_album_name":"Account Album","spotify_track_uri":"spotify:track:0123456789012345678901","platform":"web"},
+      {"ts":"2020-01-03T12:00:00Z","ms_played":120000,"master_metadata_track_name":"Second Song","master_metadata_album_artist_name":"The Band","master_metadata_album_album_name":"Account Album","spotify_track_uri":"spotify:track:1123456789012345678901"},
+      {"ts":"2020-01-04T12:00:00Z","ms_played":90000,"master_metadata_track_name":null,"master_metadata_album_artist_name":null,"spotify_episode_uri":"spotify:episode:example"},
+      {"ts":"bad","ms_played":120000,"master_metadata_track_name":"Bad Date","master_metadata_album_artist_name":"The Band"},
+      {"ts":"2020-01-04T12:00:00Z","ms_played":-1,"master_metadata_track_name":"Invalid Time","master_metadata_album_artist_name":"The Band"}
+    ]
+    """
+    let parsed = try? SpotifyArchive.parse(Data(extended.utf8))
+    expect(parsed?.events.count == 3, "full export retains valid music on every platform")
+    expect(parsed?.skipped == 3, "podcasts and invalid rows reported as skipped")
+    if let parsed {
+        let indexed = SpotifyArchive.index(parsed.events + parsed.events)
+        expect(indexed.events.count == 3, "overlapping/repeated imports are deduplicated")
+        expect(indexed.songs.count == 2, "export song grouping")
+        let song = indexed.songs[remoteTrack.trackID]
+        expect(song?.plays == 1, "sub-30-second listen not a qualifying play")
+        expect(song?.milliseconds == 190000, "short listens still contribute actual listening time")
+        expect(indexed.artists[TitleTidy.key("The Band")]?.plays == 2, "account-wide artist plays")
+        expect(indexed.albums.values.first?.plays == 2, "account-wide album plays")
+        let report = StatsBook.importedReport(track: remoteTrack, snapshot: indexed, coverage: "test export")
+        expect(report.song.tiles.first?.value == "1", "imported song stats shown")
+        expect(report.artist.tiles.first?.value == "2", "imported artist stats shown")
+        expect(report.album.tiles.first?.value == "2", "imported album stats shown")
+        expect(report.song.caption.contains("all devices") && report.song.caption.contains("test export"), "import coverage labeled")
+        let saved = String(data: (try? JSONEncoder().encode(indexed.events)) ?? Data(), encoding: .utf8) ?? ""
+        expect(!saved.contains("PRIVATE") && !saved.contains("platform") && !saved.contains("ip_addr"), "sensitive export fields stripped")
+        expect((try? JSONDecoder().decode([SpotifyArchive.Event].self, from: Data(saved.utf8))) == indexed.events,
+               "sanitized archive round-trips")
+    }
+    expect((try? SpotifyArchive.parse(Data(#"[{"endTime":"2020-01-01 12:00","msPlayed":100}]"#.utf8))) == nil,
+           "standard account export not mislabeled lifetime history")
+    expect((try? SpotifyArchive.parse(Data("not json".utf8))) == nil, "malformed export rejected")
+
+    // Artist audience: never confuse followers or another artist's biography with monthly listeners.
+    expect(AudiencePages.monthlyListeners(in: #"<meta property="og:description" content="Artist · 25.4M monthly listeners.">"#) == "25.4M",
+           "rounded public monthly listener metadata kept as published")
+    expect(AudiencePages.monthlyListeners(in: #"<meta content="Artist · 25,399,931 monthly listeners." name="description">"#) == "25,399,931",
+           "exact public monthly listener metadata parses")
+    expect(AudiencePages.monthlyListeners(in: #"<meta name="description" content="25M followers"><p>50M monthly listeners</p>"#) == nil,
+           "followers and arbitrary body text rejected")
+    expect(AudiencePages.monthlyListeners(in: "<html>Sign in</html>") == nil, "missing audience count stays unavailable")
+    expect(AudiencePages.artistURL(id: "../wrong") == nil, "invalid artist ID rejected")
+    expect(AudiencePages.artistID(URL(string: "https://example.com/artist/0123456789012345678901")!) == nil,
+           "audience links restricted to Spotify")
 
     // MARK: Saved files from 1.2 have no album field
 

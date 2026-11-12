@@ -36,6 +36,13 @@ else
 fi
 
 cp "$root/Info.plist" "$app/Contents/Info.plist"
+if [[ -n "${MINIDECK_SPOTIFY_CLIENT_ID:-}" ]]; then
+  if ! [[ "$MINIDECK_SPOTIFY_CLIENT_ID" =~ '^[a-fA-F0-9]{32}$' ]]; then
+    print "MINIDECK_SPOTIFY_CLIENT_ID must be a 32-character public Client ID, not a secret."
+    exit 1
+  fi
+  /usr/libexec/PlistBuddy -c "Add :MiniDeckSpotifyClientID string $MINIDECK_SPOTIFY_CLIENT_ID" "$app/Contents/Info.plist"
+fi
 print -n "APPL????" > "$app/Contents/PkgInfo"
 
 # Files from the Desktop or iCloud carry Finder metadata that codesign rejects.

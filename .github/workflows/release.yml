@@ -26,6 +26,8 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Build universal app
+        env:
+          MINIDECK_SPOTIFY_CLIENT_ID: ${{ vars.MINIDECK_SPOTIFY_CLIENT_ID }}
         run: zsh make-release.zsh
 
       - name: Publish release

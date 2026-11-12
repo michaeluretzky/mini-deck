@@ -42,23 +42,47 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 
 ## Your listening stats
 
+First launch includes an interactive **Setup & Help** guide with automatic checks, copy/paste helpers and a manual fallback. Playback and full-history import do not need a developer app. See [the complete setup guide](SETUP.md), including optional auto-import and distributor-configured sign-in.
+
 Rest the pointer on the cover. "Your listening" starts as one compact row with the top stat for the song, the artist and the album. Click **Show advanced** to see everything (Mini Deck remembers your choice):
 
-- **This song:** plays, last played, top-song rank, favorite, date added.
-- **This artist:** top-artist rank, total plays, songs played, last played, when you first heard them, and your top 3 songs by them.
-- **This album:** album plays, songs played (for example 7/12), last played, and your top songs on the album.
+- **Spotify account:** account-wide top-song/artist ranks and recent plays, not device-local counts. The API supplies top lists and recent tracks, not lifetime totals ([top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks), [recently played](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
+- **Imported Spotify history:** song, artist and album play totals, actual listening time, top songs and date coverage from the export you select. A play means at least 30 seconds; listening time also includes shorter listens.
+- **Apple Music:** library plays, last played, favorites and library rankings. These are Music library values, not a claim of complete cloud-account history.
 
 | Source | Where the numbers come from | Setup |
 | --- | --- | --- |
 | Spotify account | Your top 50 songs and artists (4 weeks, 6 months, 12 months) and your last 50 plays on any device | Connect once (below) |
 | Apple Music library | Play counts and last-played dates the Music app keeps for every song | None |
-| This Mac | Plays and listening time Mini Deck counts while it runs, for both apps | None. Can be turned off |
+| Spotify import | Music records from Spotify's Extended Streaming History export, across devices | Import the extracted JSON files |
+| This Mac (history window only) | Plays and listening time Mini Deck counts while it runs, for both apps; never mixed into the main card | None. Can be turned off |
 
-The **Listening History** window has the same three sources, each with Recent, Top Songs, Top Artists and Top Albums lists. Spotify doesn't offer a top-albums list, so Mini Deck ranks albums by how many of your top songs they hold.
+The **Listening History** window separates live Spotify data, imported Spotify history, Apple Music, and This Mac. Each has Recent, Top Songs, Top Artists and Top Albums lists. The live Spotify album list is derived from the albums represented in your top songs, not a lifetime album-play ranking.
+
+### Full-account history workaround
+
+Spotify's **Extended streaming history** contains records from the lifetime of your account. The regular Account Data package only covers the past year ([Spotify's data guide](https://support.spotify.com/us/article/understanding-your-data/)).
+
+1. In Spotify's **Download your data** tool, request **Extended streaming history**.
+2. When Spotify provides the download, unzip it.
+3. In Mini Deck choose **Listening Stats > Import Full Spotify History…**.
+4. Select all relevant `Streaming_History_Audio*.json` or `endsong*.json` files, or their containing folder.
+
+Import happens locally, without extra API calls. Mini Deck keeps only music names, Spotify track URIs, timestamps and milliseconds listened. It discards IP addresses, usernames, platforms, locations and private-session flags. Podcast/video rows and invalid records are skipped and counted in the import message. Exact duplicate events are ignored when importing overlapping files.
+
+The card prioritizes imported totals and shows the imported date range. Importing only some files produces partial coverage, so Mini Deck never labels an unverified subset as complete lifetime history. Later API plays are **not** merged into export totals: the API and export use different event timing and the API lacks actual listened duration. Re-import a newer export to update historical totals without double-counting.
+
+The history window displays up to 100 rows per list, with totals computed across every imported music record. Imports accept extracted JSON files/folders, not ZIP archives; limits are 64 MB per file and 256 MB per batch. Import fewer files at a time if needed. Remove the sanitized copy with **Listening Stats > Remove Imported Spotify History…**.
+
+### Artist monthly listeners
+
+The artist/band heading shows Spotify monthly listeners only when verifiable description metadata is returned by that artist's public Spotify page, with Spotify explicitly named. Exact or rounded values are retained as published. Successful results are cached in memory for six hours; missing results for 15 minutes. This is best-effort public-page data, not a supported Web API metric.
+
+If Spotify serves a shell/login page or no audience metadata, the heading offers **Monthly listeners** as a link instead of inventing a count. Spotify's official artist API does not include monthly listeners ([artist reference](https://developer.spotify.com/documentation/web-api/reference/get-an-artist)). Apple Music's public artist attributes also do not include it ([Apple reference](https://developer.apple.com/documentation/applemusicapi/artists/attributes)); when available, an artist's Spotify count is labeled Spotify even during Apple Music playback. Followers and popularity scores are never presented as listener counts.
 
 ### Connect Spotify
 
-Spotify requires each user to bring their own developer app. This takes about two minutes:
+Live Spotify stats are optional. A build with an appropriately configured distributor Client ID offers one-click OAuth; otherwise the interactive guide walks through your own developer registration. Development-mode restrictions still apply ([Spotify quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes)).
 
 1. Sign in to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app (any name and description).
 2. Under **Redirect URIs**, add `http://127.0.0.1:8974/callback`.
