@@ -223,9 +223,6 @@ struct Pad: View {
         }
         .buttonStyle(Squish())
         .zone(id, pointer)
-        .overlay(alignment: .bottom) {
-            if lit == true { Circle().fill(tint).frame(width: 3, height: 3).offset(y: 2) }
-        }
         .scaleEffect(hot ? 1.1 : 1)
         .animation(.easeOut(duration: 0.12), value: hot)
         .help(tip)
