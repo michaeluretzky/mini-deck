@@ -1,6 +1,6 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.3.3 fixes a playback-reader compilation error that prevented the current track and local listening history from updating. The compact listening summary and Show advanced option are unchanged.
+Version 1.3.4 fixes a playback-reader compilation error that prevented the current track and local listening history from updating. The compact listening summary and Show advanced option are unchanged, and the macOS 27 build compatibility fixes from 1.3.3 are preserved.
 
 **Download:** `Mini-Deck-<version>.zip` below. It runs on Apple silicon and Intel Macs with macOS 14 or later.
 

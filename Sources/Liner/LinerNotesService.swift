@@ -32,7 +32,7 @@ struct AlbumNotes: Equatable, Sendable {
 /// Apple's iTunes Search, MusicBrainz, Wikidata and Wikipedia.
 actor LinerNotesService {
     static let shared = LinerNotesService()
-    static let agent = "MiniDeck/1.3.3 ( https://github.com/michaeluretzky/mini-deck )"
+    static let agent = "MiniDeck/1.3.4 ( https://github.com/michaeluretzky/mini-deck )"
 
     private var albums: [String: AlbumNotes?] = [:]
     private var songs: [String: String?] = [:]
