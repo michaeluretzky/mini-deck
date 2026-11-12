@@ -40,7 +40,7 @@ final class MusicLibrary {
         var topAlbums: [AlbumTotal] = []
     }
 
-    static let listLength = 50
+    nonisolated static let listLength = 50
 
     private(set) var totals: [String: Total] = [:]
     private(set) var ranks: [String: Int] = [:]
