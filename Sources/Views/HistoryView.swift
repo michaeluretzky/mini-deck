@@ -182,34 +182,44 @@ enum HistoryBook {
     }
 }
 
+/// What the history window shows. Lives with the window so the choice
+/// survives redraws. A plain observable model instead of `@State`, because
+/// Apple's Command Line Tools for macOS 27 don't ship the SwiftUI macro plugin.
+@MainActor @Observable
+final class HistoryPicks {
+    var source: HistorySource
+    var list: HistoryList = .recent
+    var span: SpotifyAccount.Span = .short
+
+    init(source: HistorySource) { self.source = source }
+}
+
 struct HistoryView: View {
     let hub: Hub
-    @State private var source: HistorySource
-    @State private var list: HistoryList = .recent
-    @State private var span: SpotifyAccount.Span = .short
+    let picks: HistoryPicks
 
-    init(hub: Hub) {
-        self.hub = hub
-        _source = State(initialValue: hub.deck.source == .music ? .music : .spotify)
-    }
+    private var source: HistorySource { picks.source }
+    private var list: HistoryList { picks.list }
+    private var span: SpotifyAccount.Span { picks.span }
+    private var sourceBinding: Binding<HistorySource> { Binding(get: { picks.source }, set: { picks.source = $0 }) }
 
     var body: some View {
         let page = HistoryBook.page(source, list, span: span, hub: hub)
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Source", selection: $source) {
+            Picker("Source", selection: sourceBinding) {
                 ForEach(HistorySource.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
 
             HStack {
-                Picker("List", selection: $list) {
+                Picker("List", selection: Binding(get: { picks.list }, set: { picks.list = $0 })) {
                     ForEach(HistoryList.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 if source == .spotify && list != .recent {
-                    Picker("Time", selection: $span) {
+                    Picker("Time", selection: Binding(get: { picks.span }, set: { picks.span = $0 })) {
                         ForEach(SpotifyAccount.Span.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     .labelsHidden()
@@ -306,7 +316,8 @@ final class HistoryWindow {
                              backing: .buffered, defer: false)
             w.title = "Listening History"
             w.isReleasedWhenClosed = false
-            w.contentView = NSHostingView(rootView: HistoryView(hub: hub))
+            let picks = HistoryPicks(source: hub.deck.source == .music ? .music : .spotify)
+            w.contentView = NSHostingView(rootView: HistoryView(hub: hub, picks: picks))
             w.setFrameAutosaveName("MiniDeckHistory")
             if !w.setFrameUsingName("MiniDeckHistory") { w.center() }
             window = w
