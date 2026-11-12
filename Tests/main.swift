@@ -208,5 +208,57 @@ MainActor.assumeIsolated {
     expect(StatsBook.ago(Date().addingTimeInterval(-300)) == "5 min ago", "minutes ago")
 }
 
+@MainActor
+func checkImportPersistence() async {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("MiniDeck-import-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    do {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let input = folder.appendingPathComponent("Streaming_History_Audio_test.json")
+        let destination = folder.appendingPathComponent("saved/spotify-import.json")
+        let fixture = #"[{"ts":"2021-01-01T00:00:00Z","ms_played":60000,"master_metadata_track_name":"Test Song","master_metadata_album_artist_name":"Test Artist","master_metadata_album_album_name":"Test Album","spotify_track_uri":"spotify:track:0123456789012345678901","ip_addr":"never-save-this"}]"#
+        try Data(fixture.utf8).write(to: input)
+        let archive = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where archive.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(!archive.loading, "archive startup load completes")
+        try await archive.importFiles([input])
+        expect(archive.snapshot.events.count == 1, "file import succeeds")
+        try await archive.importFiles([input])
+        expect(archive.snapshot.events.count == 1, "file re-import does not double-count")
+        let saved = try String(contentsOf: destination, encoding: .utf8)
+        expect(!saved.contains("never-save-this") && !saved.contains("ip_addr"), "saved file excludes private fields")
+        let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
+        expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600, "saved import is user-readable only")
+        let reopened = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where reopened.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(reopened.snapshot.events == archive.snapshot.events, "saved import reloads after restart")
+        try Data("invalid".utf8).write(to: input)
+        do {
+            try await archive.importFiles([input])
+            expect(false, "invalid file must fail")
+        } catch {
+            expect(archive.snapshot.events.count == 1, "failed import preserves loaded records")
+            expect(try String(contentsOf: destination, encoding: .utf8) == saved, "failed import preserves saved file")
+        }
+        try Data("damaged".utf8).write(to: destination)
+        let damaged = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where damaged.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(damaged.loadError != nil, "damaged saved archive is reported, not silently discarded")
+        try Data(fixture.utf8).write(to: input)
+        do {
+            try await damaged.importFiles([input])
+            expect(false, "damaged archive must not be overwritten")
+        } catch {
+            expect(try String(contentsOf: destination, encoding: .utf8) == "damaged", "damaged saved data left untouched")
+        }
+        try damaged.clear()
+        expect(!FileManager.default.fileExists(atPath: destination.path), "explicit removal clears only saved import")
+        expect(FileManager.default.fileExists(atPath: input.path), "original export survives removal")
+    } catch {
+        expect(false, "import persistence test: \(error.localizedDescription)")
+    }
+}
+
+await checkImportPersistence()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

@@ -56,7 +56,7 @@ final class SpotifyArchive {
     }
 
     enum ImportError: LocalizedError {
-        case noFiles, tooLarge, wrongFormat, noSongs, unavailable
+        case noFiles, tooLarge, wrongFormat, noSongs, unavailable, busy, savedUnreadable
         var errorDescription: String? {
             switch self {
             case .noFiles: "Choose the extracted Streaming_History_Audio*.json or endsong*.json files, or their folder."
@@ -64,6 +64,8 @@ final class SpotifyArchive {
             case .wrongFormat: "This is not a supported Extended Streaming History JSON file. Request Extended streaming history, not Account data."
             case .noSongs: "No valid music records were found. Podcast/video-only files and invalid records are not added."
             case .unavailable: "The history file could not be read."
+            case .busy: "History is already loading or importing. Wait for it to finish and try again."
+            case .savedUnreadable: "The saved Spotify import could not be read and has not been overwritten. Remove the saved import from Listening Stats, then re-import your original export."
             }
         }
     }
@@ -82,6 +84,7 @@ final class SpotifyArchive {
     private(set) var loading = false
     private(set) var message = ""
     private(set) var watchedFolderName: String?
+    private(set) var loadError: String?
     @ObservationIgnored private let storageURL: URL?
     @ObservationIgnored private var watcher: Task<Void, Never>?
     private static let watchKey = "minideck.spotifyExportFolder"
@@ -92,13 +95,18 @@ final class SpotifyArchive {
             loading = true
             Task {
                 let loaded = await Task.detached(priority: .utility) {
+                    guard FileManager.default.fileExists(atPath: storageURL.path) else { return (Snapshot(), false) }
                     guard let data = try? Data(contentsOf: storageURL),
-                          let events = try? JSONDecoder().decode([Event].self, from: data) else { return Snapshot() }
-                    return Self.index(events)
+                          let events = try? JSONDecoder().decode([Event].self, from: data) else { return (Snapshot(), true) }
+                    return (Self.index(events), false)
                 }.value
-                snapshot = loaded
+                snapshot = loaded.0
+                if loaded.1 {
+                    loadError = ImportError.savedUnreadable.localizedDescription
+                    message = loadError ?? ""
+                }
                 loading = false
-                restoreWatch()
+                if !loaded.1 { restoreWatch() }
             }
         }
     }
@@ -110,7 +118,8 @@ final class SpotifyArchive {
     }
 
     func importFiles(_ urls: [URL]) async throws {
-        guard !busy, !loading else { return }
+        guard !busy, !loading else { throw ImportError.busy }
+        guard loadError == nil else { throw ImportError.savedUnreadable }
         busy = true
         defer { busy = false }
         let existing = snapshot.events
@@ -146,12 +155,13 @@ final class SpotifyArchive {
     }
 
     func clear() throws {
-        guard !busy, !loading else { return }
+        guard !busy, !loading else { throw ImportError.busy }
         if let storageURL, FileManager.default.fileExists(atPath: storageURL.path) {
             try FileManager.default.removeItem(at: storageURL)
         }
         snapshot = Snapshot()
         message = ""
+        loadError = nil
     }
 
     /// The user explicitly selects one folder. Nothing scans Downloads or

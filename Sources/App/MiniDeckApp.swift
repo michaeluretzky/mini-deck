@@ -286,7 +286,7 @@ struct StatusMenu: View {
             if hub.archive.watchedFolderName != nil {
                 Button("Stop Automatic Imports") { hub.archive.stopWatching() }
             }
-            if hub.archive.hasHistory {
+            if hub.archive.hasHistory || hub.archive.loadError != nil {
                 Button("Remove Imported Spotify History…") { hub.clearSpotifyImport() }
                     .disabled(hub.archive.busy)
             }
