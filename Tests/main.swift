@@ -17,7 +17,7 @@ func expect(_ ok: Bool, _ what: String, line: Int = #line) {
     }
 }
 
-MainActor.assumeIsolated {
+await MainActor.run {
     let day: Double = 86_400
     let now = Date().timeIntervalSince1970
 

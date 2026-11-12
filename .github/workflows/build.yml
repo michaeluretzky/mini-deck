@@ -36,7 +36,7 @@ jobs:
           set -euo pipefail
           cache="$RUNNER_TEMP/cache"
           export CLANG_MODULE_CACHE_PATH="$cache"
-          xcrun swiftc -swift-version 5 -module-name MiniDeckTests -target arm64-apple-macos14.0 \
+          xcrun swiftc -swift-version 5 -warnings-as-errors -module-name MiniDeckTests -target arm64-apple-macos14.0 \
             -module-cache-path "$cache" \
             Sources/Stats/*.swift Sources/Liner/*.swift Sources/Playback/Players.swift Tests/main.swift \
             -o "$RUNNER_TEMP/HistoryTests"

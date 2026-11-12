@@ -10,6 +10,6 @@ For historical totals, request **Extended streaming history** in Spotify's Downl
 
 **Download:** `Mini-Deck-<version>.zip` below. It runs on Apple silicon and Intel Macs with macOS 14 or later.
 
-**First open:** macOS blocks apps from outside the App Store the first time. Open the app once, then go to System Settings > Privacy & Security and click **Open Anyway**. Full steps are in the [README](https://github.com/michaeluretzky/mini-deck#download-and-install).
+**First open:** This release is ad-hoc signed, not Apple-notarized, so macOS may block its first launch. If you trust the release, try opening it, then go to System Settings > Privacy & Security and click **Open Anyway**. Full steps are in the [README](https://github.com/michaeluretzky/mini-deck#download-and-install).
 
 Free for personal use. See [LICENSE](https://github.com/michaeluretzky/mini-deck/blob/main/LICENSE).
