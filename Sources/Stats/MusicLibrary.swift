@@ -68,26 +68,31 @@ final class MusicLibrary {
             guard let self else { return }
             self.scanning = false
             guard let result else { self.failed = true; return }
-            self.failed = false
-            self.totals = result.totals
-            let ordered = result.totals.filter { $0.value.plays > 0 }.sorted {
-                $0.value.plays != $1.value.plays ? $0.value.plays > $1.value.plays : $0.key < $1.key
-            }
-            var ranks: [String: Int] = [:]
-            var place = 0
-            var previous = Int.max
-            for (i, entry) in ordered.enumerated() {
-                if entry.value.plays < previous { place = i + 1; previous = entry.value.plays }
-                ranks[entry.key] = place
-            }
-            self.ranks = ranks
-            self.topArtists = ordered.prefix(Self.listLength).map { ArtistTotal(name: result.names[$0.key] ?? $0.key, total: $0.value) }
-            self.mostPlayed = result.mostPlayed
-            self.recentlyPlayed = result.recentlyPlayed
-            self.all = result.all
-            self.topAlbums = result.topAlbums
-            self.scanned = Date()
+            self.apply(result)
         }
+    }
+
+    /// Stores a finished scan and works out artist ranks.
+    func apply(_ result: Scan, at time: Date = Date()) {
+        failed = false
+        totals = result.totals
+        let ordered = result.totals.filter { $0.value.plays > 0 }.sorted {
+            $0.value.plays != $1.value.plays ? $0.value.plays > $1.value.plays : $0.key < $1.key
+        }
+        var ranks: [String: Int] = [:]
+        var place = 0
+        var previous = Int.max
+        for (i, entry) in ordered.enumerated() {
+            if entry.value.plays < previous { place = i + 1; previous = entry.value.plays }
+            ranks[entry.key] = place
+        }
+        self.ranks = ranks
+        topArtists = ordered.prefix(Self.listLength).map { ArtistTotal(name: result.names[$0.key] ?? $0.key, total: $0.value) }
+        mostPlayed = result.mostPlayed
+        recentlyPlayed = result.recentlyPlayed
+        all = result.all
+        topAlbums = result.topAlbums
+        scanned = time
     }
 
     // MARK: Artist and album history
