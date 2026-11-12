@@ -1,3 +1,6 @@
+# Mini Deck. Copyright (c) 2026 Michael Uretzky. All rights reserved.
+# Free for personal use. See LICENSE.
+
 name: Build
 
 # Compiles Mini Deck for Apple silicon and Intel on every push and pull request.
