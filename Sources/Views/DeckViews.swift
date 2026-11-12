@@ -757,7 +757,8 @@ struct ListeningSection: View {
                 ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead, emptyText: empty)
-            } else if deck.source == .spotify && !hub.archive.hasHistory && hub.account.isConnected {
+            } else if deck.source == .spotify && !hub.archive.hasHistory
+                        && hub.account.isConnected && hub.account.updated != nil {
                 SpotifySummary(report: report, tint: deck.swatch.lead)
             } else if !report.isEmpty {
                 SummaryRow(report: report, tint: deck.swatch.lead)
@@ -840,7 +841,7 @@ struct SpotifySummary: View {
             row("Artist ranking", report.artist.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
             row("Song ranking", report.song.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
             row("Last recent play", report.song.tiles.first { $0.caption == "last in recent history" }?.value ?? "Not in recent history")
-            Text("Recent history only · not lifetime totals")
+            Text("Spotify affinity rankings · recent history only")
                 .font(.system(size: 9)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
