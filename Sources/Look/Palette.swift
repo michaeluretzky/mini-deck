@@ -137,18 +137,21 @@ enum Palette {
 enum CoverArt {
     /// Resamples the cover to the exact pixel size of the current screen so small cover text stays sharp.
     static func render(_ image: CGImage, side: CGFloat, scale: CGFloat) -> NSImage {
-        let size = NSSize(width: side, height: side)
-        let fallback = NSImage(cgImage: image, size: size)
+        NSImage(cgImage: pixels(image, side: side, scale: scale), size: NSSize(width: side, height: side))
+    }
+
+    /// The resampled pixels only. Safe to run off the main thread; returns the original if resampling fails.
+    static func pixels(_ image: CGImage, side: CGFloat, scale: CGFloat) -> CGImage {
         let px = max(1, Int((side * scale).rounded()))
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let format = vImage_CGImageFormat(bitsPerComponent: 8, bitsPerPixel: 32, colorSpace: space,
                                                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)),
-              var source = try? vImage_Buffer(cgImage: image, format: format) else { return fallback }
+              var source = try? vImage_Buffer(cgImage: image, format: format) else { return image }
         defer { source.free() }
-        guard var target = try? vImage_Buffer(width: px, height: px, bitsPerPixel: 32) else { return fallback }
+        guard var target = try? vImage_Buffer(width: px, height: px, bitsPerPixel: 32) else { return image }
         defer { target.free() }
         let status = vImageScale_ARGB8888(&source, &target, nil, vImage_Flags(kvImageHighQualityResampling))
-        guard status == kvImageNoError, let out = try? target.createCGImage(format: format) else { return fallback }
-        return NSImage(cgImage: out, size: size)
+        guard status == kvImageNoError, let out = try? target.createCGImage(format: format) else { return image }
+        return out
     }
 }

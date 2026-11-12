@@ -235,10 +235,11 @@ final class Deck {
         decoding = true
         coverTask = Task { [weak self] in
             defer { self?.decoding = false }
-            let made = await Task.detached(priority: .userInitiated) { () -> (CGImage, NSImage, Swatch)? in
+            let side = Metrics.cover
+            let made = await Task.detached(priority: .userInitiated) { () -> (CGImage, CGImage, Swatch)? in
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil),
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-                return (image, CoverArt.render(image, side: Metrics.cover, scale: scale), Palette.swatch(for: image))
+                return (image, CoverArt.pixels(image, side: side, scale: scale), Palette.swatch(for: image))
             }.value
             guard let self, !Task.isCancelled, self.coverKey == tag else { return }
             guard let made else {
@@ -251,7 +252,7 @@ final class Deck {
                 return
             }
             self.coverSource = made.0
-            self.cover = made.1
+            self.cover = NSImage(cgImage: made.1, size: NSSize(width: side, height: side))
             self.swatch = made.2
         }
     }
