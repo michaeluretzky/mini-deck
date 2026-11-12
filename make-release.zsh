@@ -1,4 +1,6 @@
 #!/bin/zsh
+# Mini Deck. Copyright (c) 2026 Michael Uretzky. All rights reserved.
+# Free for personal use. See LICENSE.
 # Builds a universal (Apple silicon + Intel) Mini Deck.app and zips it into dist/.
 # Used by the GitHub release workflow. You can also run it on your own Mac.
 set -euo pipefail

@@ -1,4 +1,6 @@
 #!/bin/zsh
+# Mini Deck. Copyright (c) 2026 Michael Uretzky. All rights reserved.
+# Free for personal use. See LICENSE.
 # Builds Mini Deck.app and installs it to ~/Applications.
 set -euo pipefail
 
