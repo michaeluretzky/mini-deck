@@ -1,0 +1,6 @@
+SpotifyLogo.png is the unmodified Spotify full white RGB logo supplied in
+https://developer.spotify.com/images/guidelines/design/2024-spotify-full-logo.zip
+Spotify and its logo are trademarks of Spotify AB. This asset is not covered
+by Mini Deck's personal-use source license. Use follows Spotify's branding terms:
+https://developer.spotify.com/documentation/design
+Mini Deck is independent and is not endorsed or approved by Spotify.

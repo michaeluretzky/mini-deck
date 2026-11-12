@@ -82,33 +82,19 @@ enum HistoryBook {
         switch list {
         case .recent:
             page.rows = account.recent.map { HistoryRow(rank: nil, title: $0.title, subtitle: $0.artist, detail: StatsBook.ago($0.at)) }
-            page.note = "Your last \(account.recent.count) plays on any device, from Spotify."
+            page.note = "Available recent records from your Spotify account across devices, not complete history."
         case .songs:
             page.rows = (account.topSongs[span] ?? []).enumerated().map {
                 HistoryRow(rank: $0.offset + 1, title: $0.element.title, subtitle: $0.element.subtitle, detail: "")
             }
-            page.note = "Your top songs over the last \(span.label), from Spotify."
+            page.note = "Spotify song affinity rankings · approximately \(span.label). Not play counts."
         case .artists:
             page.rows = (account.topArtists[span] ?? []).enumerated().map {
                 HistoryRow(rank: $0.offset + 1, title: $0.element.title, subtitle: "", detail: "")
             }
-            page.note = "Your top artists over the last \(span.label), from Spotify."
+            page.note = "Spotify artist affinity rankings · approximately \(span.label). Not play counts."
         case .albums:
-            // Spotify has no top-albums list, so count how many of your top songs come from each album.
-            var counts: [String: (album: String, artist: String, songs: Int, best: Int)] = [:]
-            for (i, song) in (account.topSongs[span] ?? []).enumerated() where !song.album.isEmpty {
-                let key = TitleTidy.key(song.album) + "/" + (song.artistKeys.first ?? "")
-                var entry = counts[key] ?? (song.album, song.subtitle, 0, i + 1)
-                entry.songs += 1
-                entry.best = min(entry.best, i + 1)
-                counts[key] = entry
-            }
-            let ordered = counts.values.sorted { $0.songs != $1.songs ? $0.songs > $1.songs : $0.best < $1.best }
-            page.rows = ordered.enumerated().map {
-                HistoryRow(rank: $0.offset + 1, title: $0.element.album, subtitle: $0.element.artist,
-                           detail: $0.element.songs == 1 ? "1 top song" : "\($0.element.songs) top songs")
-            }
-            page.note = "Albums ranked by how many of your top 50 songs (last \(span.label)) they hold."
+            page.empty = .message("Spotify does not supply a top-albums ranking. No album ranking is inferred from your top songs. Imported history is available separately in Spotify import.")
         }
         return page
     }

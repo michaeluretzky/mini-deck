@@ -31,6 +31,7 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 ## Features
 
 - Play, pause, skip, shuffle, repeat and seek from a small card that floats over your windows.
+- Song, artist and album appear on separate icon-led rows, with extra spacing before the controls and playback bar.
 - Scroll over the card to change the volume.
 - The card's colors come from the album cover.
 - Rest the pointer on the cover to see:
@@ -44,7 +45,9 @@ To update, quit Mini Deck, replace the app in Applications, and open it again. m
 
 First launch includes an interactive **Setup & Help** guide with automatic checks, copy/paste helpers and a manual fallback. Playback and full-history import do not need a developer app. See [the complete setup guide](SETUP.md), including optional auto-import and distributor-configured sign-in.
 
-Rest the pointer on the cover. "Your listening" starts as one compact row with the top stat for the song, the artist and the album. Click **Show advanced** to see everything (Mini Deck remembers your choice):
+Rest the pointer on the cover. Before an export is imported, **Your Spotify** shows artist and song rankings for one selected period (approximately 4 weeks, 6 months or 12 months), plus the current song's last timestamp found in returned recent history. These are Spotify affinity rankings, not measured play counts ([Spotify top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks)). Click **Show advanced** for detailed lists; Mini Deck remembers your choice.
+
+The **Full history requested** reminder appears only after you mark the request yourself, in the card or Setup & Help. It is not a Spotify status check, has no countdown, can be cleared in Setup & Help, and does not appear by default for new users. **Import when ready** opens the local importer.
 
 - **Spotify account:** account-wide top-song/artist ranks and recent plays, not device-local counts. The API supplies top lists and recent tracks, not lifetime totals ([top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks), [recently played](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
 - **Imported Spotify history:** song, artist and album play totals, actual listening time, top songs and date coverage from the export you select. A play means at least 30 seconds; listening time also includes shorter listens.
@@ -52,12 +55,14 @@ Rest the pointer on the cover. "Your listening" starts as one compact row with t
 
 | Source | Where the numbers come from | Setup |
 | --- | --- | --- |
-| Spotify account | Your top 50 songs and artists (4 weeks, 6 months, 12 months) and your last 50 plays on any device | Connect once (below) |
+| Spotify account | Returned song/artist rankings for the selected period and up to 50 available recent records across devices, not complete history | Connect once (below) |
 | Apple Music library | Play counts and last-played dates the Music app keeps for every song | None |
 | Spotify import | Music records from Spotify's Extended Streaming History export, across devices | Import the extracted JSON files |
 | This Mac (history window only) | Plays and listening time Mini Deck counts while it runs, for both apps; never mixed into the main card | None. Can be turned off |
 
-The **Listening History** window separates live Spotify data, imported Spotify history, Apple Music, and This Mac. Each has Recent, Top Songs, Top Artists and Top Albums lists. The live Spotify album list is derived from the albums represented in your top songs, not a lifetime album-play ranking.
+The **Listening History** window separates live Spotify data, imported Spotify history, Apple Music, and This Mac. Live Spotify does not show a synthetic top-albums ranking, occurrence counts, listened minutes or first-ever-listen claims. Imported history and Music library statistics remain separate.
+
+The live display uses direct API rankings and recent timestamps, but this is not a claim of Spotify approval. Broader distribution and any derived-listening features require review against [Spotify's Developer Policy](https://developer.spotify.com/policy). Spotify branding is attributed in [Assets/NOTICE.txt](Assets/NOTICE.txt).
 
 ### Full-account history workaround
 

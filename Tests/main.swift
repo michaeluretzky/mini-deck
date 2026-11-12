@@ -112,15 +112,38 @@ await MainActor.run {
                             at: Date(), title: "Different", artist: "Other Artist", album: "Account Album")
     ]
     let remote = StatsBook.spotifyReport(track: remoteTrack, top: [.medium: .init(artists: [TitleTidy.key("The Band"): 48])],
-                                        recent: remotePlays, rankedSongs: [:])
-    expect(remote.song.tiles.first?.value == "1×", "account recent play displayed")
-    expect(remote.album.tiles.first?.value == "1", "same-name album from another artist excluded")
+                                        recent: remotePlays, rankedSongs: [:], span: .medium)
+    expect(remote.song.tiles.first?.caption == "last in recent history", "recent timestamp is qualified, not a play count")
+    expect(remote.album.tiles.first?.value == StatsBook.ago(remotePlays[0].at), "album timestamp comes from matching artist")
     expect(remote.artist.tiles.first?.value == "#48", "account artist rank preserved")
     expect(remote.song.caption == StatsBook.spotifyLabel, "account source explicitly covers all devices")
     expect([remote.song, remote.artist, remote.album].flatMap(\.tiles).allSatisfy { !$0.caption.contains("here") },
            "live account card has no device-local metrics")
     let absent = StatsBook.spotifyReport(track: remoteTrack, top: [:], recent: [], rankedSongs: [:])
     expect(absent.isEmpty, "missing history is not mislabeled New or zero lifetime plays")
+    let ranks: [SpotifyAccount.Span: SpotifyAccount.Top] = [
+        .short: .init(artists: [TitleTidy.key("The Band"): 30], tracks: ["0123456789012345678901": 40]),
+        .medium: .init(artists: [TitleTidy.key("The Band"): 2], tracks: ["0123456789012345678901": 3])
+    ]
+    let ranked = SpotifyAccount.Ranked(title: "Across Devices", subtitle: "The Band",
+                                      id: "0123456789012345678901", artistKeys: [TitleTidy.key("The Band")], album: "Account Album")
+    let short = StatsBook.spotifyReport(track: remoteTrack, top: ranks, recent: remotePlays,
+                                       rankedSongs: [.medium: [ranked]], span: .short)
+    expect(short.song.tiles.first?.value == "#40", "song rank isolated to selected timeframe")
+    expect(short.artist.tiles.first?.value == "#30", "artist rank is not best across timeframes")
+    expect(short.artist.lines.isEmpty && short.album.lines.isEmpty, "lists do not leak another timeframe")
+    let medium = StatsBook.spotifyReport(track: remoteTrack, top: ranks, recent: remotePlays,
+                                        rankedSongs: [.medium: [ranked]], span: .medium)
+    expect(medium.song.tiles.first?.value == "#3", "changing timeframe changes the supplied song rank")
+    expect(medium.artist.lines.first?.detail == "#1 · 6 months", "advanced list preserves supplied position and period")
+    let missingSpan = StatsBook.spotifyReport(track: remoteTrack, top: ranks, recent: [],
+                                             rankedSongs: [.medium: [ranked]], span: .long)
+    expect(missingSpan.isEmpty, "missing timeframe does not fall back to another period")
+    let liveTiles = [short.song, short.artist, short.album].flatMap(\.tiles)
+    expect(liveTiles.allSatisfy { $0.caption.hasPrefix("Spotify ranking") || $0.caption == "last in recent history" },
+           "live tiles contain only supplied rankings or qualified timestamps")
+    expect(short.album.tiles.count == 1 && short.album.tiles[0].caption == "last in recent history",
+           "live album has no synthetic rank, count or listened duration")
 
     let extended = """
     [

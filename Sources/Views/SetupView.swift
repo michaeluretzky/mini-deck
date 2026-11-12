@@ -122,6 +122,10 @@ struct SetupView: View {
             instruction("Request the right export", "Open Spotify's privacy page, find Download your data, and request Extended streaming history. Spotify requires your sign-in and confirmation, and prepares the export separately.")
             Button("Open Spotify data request") { open("https://www.spotify.com/account/privacy/") }
                 .buttonStyle(.borderedProminent)
+            Toggle("I've requested my full history", isOn: Binding(
+                get: { hub.prefs.exportRequested }, set: { hub.prefs.exportRequested = $0 }))
+            Text("Saved on this Mac only. This is your reminder, not a Spotify processing-status check.")
+                .font(.caption).foregroundStyle(.secondary)
             instruction("Download and unzip", "When Spotify makes it available, download the export and unzip it. Keep all Streaming_History_Audio JSON files together; selecting only some files gives partial history.")
             instruction("Import once, or automate future imports", "Choose the JSON files now, or select an export folder once. Automatic import checks only that folder, waits for stable files, and deduplicates repeats.")
             HStack {

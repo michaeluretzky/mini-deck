@@ -72,7 +72,8 @@ enum StatsBook {
     static func macLabel(_ log: ListeningLog) -> String { "this Mac since \(shortDate(log.book.since))" }
 
     static func report(track: Snapshot, facts: LibraryFacts?, account: SpotifyAccount,
-                       library: MusicLibrary, archive: SpotifyArchive? = nil) -> ListeningReport {
+                       library: MusicLibrary, archive: SpotifyArchive? = nil,
+                       span: SpotifyAccount.Span = .short) -> ListeningReport {
         var out = ListeningReport()
 
         switch track.source {
@@ -86,7 +87,7 @@ enum StatsBook {
                     out.prompt = .loading
                 } else {
                     let live = spotifyReport(track: track, top: account.top, recent: account.recent,
-                                             rankedSongs: account.topSongs)
+                                             rankedSongs: account.topSongs, span: span)
                     out.song.add(live.song.tiles, from: spotifyLabel)
                     out.artist.add(live.artist.tiles, from: spotifyLabel)
                     out.album.add(live.album.tiles, from: spotifyLabel)
@@ -165,64 +166,45 @@ enum StatsBook {
 
     static func spotifyReport(track: Snapshot, top: [SpotifyAccount.Span: SpotifyAccount.Top],
                               recent: [SpotifyAccount.Play],
-                              rankedSongs: [SpotifyAccount.Span: [SpotifyAccount.Ranked]]) -> ListeningReport {
+                              rankedSongs: [SpotifyAccount.Span: [SpotifyAccount.Ranked]],
+                              span: SpotifyAccount.Span = .short) -> ListeningReport {
         var out = ListeningReport()
         let artistKeys = Set([track.primaryArtist, track.albumArtist].map(TitleTidy.key).filter { !$0.isEmpty })
         let albumKey = TitleTidy.key(track.album)
         let trackID = track.trackID.split(separator: ":").last.map(String.init) ?? ""
         let byArtist: (SpotifyAccount.Play) -> Bool = { !artistKeys.isDisjoint(with: $0.artistKeys) }
         let onAlbum: (SpotifyAccount.Play) -> Bool = { !albumKey.isEmpty && TitleTidy.key($0.album) == albumKey && byArtist($0) }
-        let recentCount = recent.count
-
-        func best(_ pick: (SpotifyAccount.Top) -> Int?) -> (rank: Int, span: SpotifyAccount.Span)? {
-            var found: (Int, SpotifyAccount.Span)?
-            for span in SpotifyAccount.Span.allCases {
-                if let r = top[span].flatMap(pick), r < (found?.0 ?? .max) { found = (r, span) }
-            }
-            return found
-        }
-
-        // Best rank across 4 weeks, 6 months and 12 months for every top song that matches.
+        // Preserve Spotify's supplied ordering in one explicitly chosen period.
+        // Do not build a best-of-periods ranking or derive play counts.
         func topSongs(_ keep: (SpotifyAccount.Ranked) -> Bool) -> [(song: SpotifyAccount.Ranked, rank: Int, span: SpotifyAccount.Span)] {
-            var bestByID: [String: (SpotifyAccount.Ranked, Int, SpotifyAccount.Span)] = [:]
-            for span in SpotifyAccount.Span.allCases {
-                for (i, song) in (rankedSongs[span] ?? []).enumerated() where keep(song) {
-                    let id = song.id.isEmpty ? song.title : song.id
-                    if (bestByID[id]?.1 ?? .max) > i + 1 { bestByID[id] = (song, i + 1, span) }
-                }
+            (rankedSongs[span] ?? []).enumerated().compactMap { index, song in
+                keep(song) ? (song, index + 1, span) : nil
             }
-            return bestByID.values.sorted { $0.1 < $1.1 }.map { ($0.0, $0.1, $0.2) }
         }
 
         // This song
         var song: [StatTile] = []
-        if !trackID.isEmpty, let t = best({ $0.tracks[trackID] }) {
-            song.append(StatTile(value: "#\(t.rank)", caption: "top song · \(t.span.label)", symbol: "music.note"))
+        if !trackID.isEmpty, let rank = top[span]?.tracks[trackID] {
+            song.append(StatTile(value: "#\(rank)", caption: "Spotify ranking · \(span.label)", symbol: "music.note"))
         }
         let songPlays = recent.filter { !trackID.isEmpty && $0.trackID == trackID }
         if !songPlays.isEmpty {
-            song.append(StatTile(value: "\(songPlays.count)×", caption: "in your last \(recentCount) plays", symbol: "arrow.counterclockwise"))
             if let last = songPlays.map(\.at).max() {
-                song.append(StatTile(value: ago(last), caption: "last played", symbol: "calendar"))
+                song.append(StatTile(value: ago(last), caption: "last in recent history", symbol: "calendar"))
             }
         }
         out.song.add(song, from: spotifyLabel)
 
         // This artist
         var art: [StatTile] = []
-        if let a = best({ top in artistKeys.compactMap { top.artists[$0] }.min() }) {
-            art.append(StatTile(value: "#\(a.rank)", caption: "top artist · \(a.span.label)", symbol: "person.fill"))
+        if let rank = top[span]?.artists[TitleTidy.key(track.primaryArtist)] {
+            art.append(StatTile(value: "#\(rank)", caption: "Spotify ranking · \(span.label)", symbol: "person.fill"))
         }
         let artistTop = topSongs { !artistKeys.isDisjoint(with: $0.artistKeys) }
-        if !artistTop.isEmpty {
-            art.append(StatTile(value: "\(artistTop.count)", caption: artistTop.count == 1 ? "song in your top lists" : "songs in your top lists",
-                                symbol: "list.number"))
-        }
         let artistPlays = recent.filter(byArtist)
         if !artistPlays.isEmpty {
-            art.append(StatTile(value: "\(artistPlays.count)", caption: "of your last \(recentCount) plays", symbol: "waveform"))
             if let last = artistPlays.map(\.at).max() {
-                art.append(StatTile(value: ago(last), caption: "last played", symbol: "calendar"))
+                art.append(StatTile(value: ago(last), caption: "last in recent history", symbol: "calendar"))
             }
         }
         out.artist.add(art, from: spotifyLabel)
@@ -234,19 +216,8 @@ enum StatsBook {
         var alb: [StatTile] = []
         let albumTop = topSongs { !albumKey.isEmpty && TitleTidy.key($0.album) == albumKey && !artistKeys.isDisjoint(with: $0.artistKeys) }
         let albumPlays = recent.filter(onAlbum)
-        if !albumPlays.isEmpty {
-            alb.append(StatTile(value: "\(albumPlays.count)", caption: "of your last \(recentCount) plays", symbol: "opticaldisc"))
-        }
-        if !albumTop.isEmpty {
-            alb.append(StatTile(value: "\(albumTop.count)", caption: albumTop.count == 1 ? "song in your top lists" : "songs in your top lists",
-                                symbol: "list.number"))
-        }
         if let last = albumPlays.map(\.at).max() {
-            alb.append(StatTile(value: ago(last), caption: "last played", symbol: "calendar"))
-        }
-        let distinct = Set(albumPlays.map(\.trackID)).count
-        if distinct > 1 {
-            alb.append(StatTile(value: "\(distinct)", caption: "songs played recently", symbol: "music.note.list"))
+            alb.append(StatTile(value: ago(last), caption: "last in recent history", symbol: "calendar"))
         }
         out.album.add(alb, from: spotifyLabel)
         out.album.list("Your top songs on this album",

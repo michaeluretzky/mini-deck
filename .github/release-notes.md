@@ -1,6 +1,10 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.4.0 separates account-wide Spotify stats from Mac-only tracking and adds a private Extended Streaming History importer for song, artist and album totals across devices. Repeated imports are deduplicated. The compact summary and Show advanced option remain.
+Version 1.4.1 separates song, artist and album into three icon-led rows, with more space before the controls and playback bar.
+
+The compact **Your Spotify** section now shows Spotify artist/song rankings for one selected period and **Last recent play**, limited to returned recent history. **Show advanced** retains detailed lists. Live occurrence counts and synthetic album rankings have been removed; live API data is not presented as lifetime totals, actual listened minutes or first-ever listens. Spotify rankings describe affinity, not measured play counts ([Spotify top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks)).
+
+A user-controlled **Full history requested** reminder provides **Import when ready**, without a guessed countdown. It is off by default and is not a Spotify processing-status check. Existing private imports, Apple Music library statistics and saved connections remain supported. Album release metadata and track count use Spotify when returned, with existing album-note fallbacks. Spotify attribution and an Open Spotify control are included.
 
 First launch now includes an interactive Setup & Help guide with automatic playback/account checks, a developer-free full-history route, four-step optional live Spotify setup, copy/paste helpers, and troubleshooting. An opt-in export-folder watcher imports stable extracted JSON files automatically. [Read the setup guide](https://github.com/michaeluretzky/mini-deck/blob/main/SETUP.md).
 

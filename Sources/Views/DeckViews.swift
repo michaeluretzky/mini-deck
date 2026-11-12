@@ -98,7 +98,7 @@ struct CoverTile: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if deck.hasTrack {
+            if deck.hasTrack && deck.source != .spotify {
                 Image(systemName: "text.below.photo.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(Color.white, Color.black.opacity(0.55))
@@ -110,7 +110,7 @@ struct CoverTile: View {
             }
         }
         .frame(width: Metrics.cover, height: Metrics.cover)
-        .clipShape(.rect(cornerRadius: 9, style: .continuous))
+        .clipShape(.rect(cornerRadius: deck.source == .spotify ? 0 : 9, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder(Color.white.opacity(hot ? 0.4 : 0.06), lineWidth: hot ? 1.5 : 1)
@@ -130,25 +130,41 @@ struct NowPlayingColumn: View {
     let prefs: Prefs
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .top, spacing: 7) {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(deck.swatch.lead)
+                        .frame(width: 16)
+                        .accessibilityHidden(true)
+                    Text(deck.track.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if prefs.soundBars {
                         SoundBars(spectrum: spectrum, playing: deck.isPlaying, tint: deck.swatch.lead)
-                            .padding(.top, 4)
+                            .accessibilityHidden(true)
                     }
-                    Text("\(Text(deck.track.title).font(.system(size: 16, weight: .bold)))\(Text("  ·  ").foregroundStyle(.tertiary))\(Text(deck.track.artist).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary))")
-                        .lineLimit(3)
-                        .minimumScaleFactor(0.8)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "person.fill").frame(width: 16).accessibilityHidden(true)
+                    Text(deck.track.artist)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(deck.track.album)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 12.5, weight: .medium)).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "opticaldisc").frame(width: 16).accessibilityHidden(true)
+                    Text(deck.track.album)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 11.5)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 6)
             .id(deck.track.title + "\n" + deck.track.artist)
             .transition(.opacity)
 
@@ -157,6 +173,30 @@ struct NowPlayingColumn: View {
                 .zone(Zone.transport, pointer)
 
             Scrubber(deck: deck, pointer: pointer)
+                .padding(.top, 4)
+            if deck.source == .spotify {
+                Button {
+                    let parts = deck.track.trackID.split(separator: ":")
+                    if parts.count == 3, parts[0] == "spotify", parts[1] == "track",
+                       parts[2].count == 22, parts[2].allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }),
+                       let url = URL(string: "https://open.spotify.com/track/\(parts[2])") {
+                        NSWorkspace.shared.open(url)
+                    } else {
+                        deck.revealApp()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if let logo = NSImage(named: "SpotifyLogo") {
+                            Image(nsImage: logo).resizable().scaledToFit().frame(width: 70, height: 22)
+                        } else {
+                            Text("Spotify")
+                        }
+                        Text("Open Spotify").font(.system(size: 9))
+                        Image(systemName: "arrow.up.right").font(.system(size: 8))
+                    }
+                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel("Open this track in Spotify")
+            }
         }
     }
 }
@@ -539,7 +579,7 @@ struct InfoDrawer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            MusicSection(deck: deck)
+                MusicSection(deck: deck, account: hub.account)
             Rule()
             ArtistSection(deck: deck)
             Rule()
@@ -566,22 +606,27 @@ extension Deck {
 /// 1. About this song and album.
 struct MusicSection: View {
     let deck: Deck
+    let account: SpotifyAccount
 
     var body: some View {
         let n = deck.albumNotes
+        let spotifyAlbum = deck.source == .spotify && account.currentAlbum?.trackID == deck.track.trackID
+            ? account.currentAlbum?.album : nil
         VStack(alignment: .leading, spacing: 6) {
             Heading(text: "About this song & album")
             if let note = deck.songNote {
                 Blurb(text: note)
             }
-            if let n, n.hasFacts {
+            if n?.hasFacts == true || spotifyAlbum != nil {
                 Flow {
-                    if let year = n.year { FactChip(symbol: "calendar", text: "Released \(year)", tint: deck.swatch.lead) }
-                    if let count = n.songCount {
+                    if let date = spotifyAlbum?.release_date ?? n?.year {
+                        FactChip(symbol: "calendar", text: "Released \(date)", tint: deck.swatch.lead)
+                    }
+                    if let count = spotifyAlbum?.total_tracks ?? n?.songCount {
                         FactChip(symbol: "music.note.list", text: count == 1 ? "1 song" : "\(count) songs", tint: deck.swatch.lead)
                     }
-                    if let seconds = n.runtime { FactChip(symbol: "clock", text: Clock.runtime(seconds), tint: deck.swatch.lead) }
-                    if let genre = n.genre { FactChip(symbol: "tag", text: genre, tint: deck.swatch.lead) }
+                    if let seconds = n?.runtime { FactChip(symbol: "clock", text: Clock.runtime(seconds), tint: deck.swatch.lead) }
+                    if let genre = n?.genre { FactChip(symbol: "tag", text: genre, tint: deck.swatch.lead) }
                 }
             }
             if let summary = n?.summary {
@@ -672,11 +717,11 @@ struct ListeningSection: View {
 
     var body: some View {
         let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
-                                      library: hub.library, archive: hub.archive)
+                                      library: hub.library, archive: hub.archive, span: hub.prefs.spotifySpan)
         VStack(alignment: .leading, spacing: 8) {
             let advanced = hub.prefs.statsAdvanced
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Heading(text: deck.source == .spotify ? "Your Spotify listening" : "Your Music library")
+                Heading(text: deck.source == .spotify ? "Your Spotify" : "Your Music library")
                 Spacer(minLength: 0)
                 if !report.isEmpty {
                     Button { hub.prefs.statsAdvanced.toggle() } label: {
@@ -693,13 +738,27 @@ struct ListeningSection: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(deck.swatch.lead)
-                .help("Open your full listening history")
+                .help("Open available listening history")
+            }
+            if deck.source == .spotify && !hub.archive.hasHistory {
+                HStack {
+                    Text("Spotify ranking period").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("Spotify ranking period", selection: Binding(
+                        get: { hub.prefs.spotifySpan }, set: { hub.prefs.spotifySpan = $0 })) {
+                        ForEach(SpotifyAccount.Span.allCases, id: \.self) { span in
+                            Text(span.label).tag(span)
+                        }
+                    }.labelsHidden().pickerStyle(.menu).fixedSize().controlSize(.mini)
+                }
             }
             if advanced {
                 let empty = deck.source == .spotify ? "Not present in the available Spotify history." : ""
                 ScopeBlock(title: "This song", scope: report.song, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This artist", scope: report.artist, tint: deck.swatch.lead, emptyText: empty)
                 ScopeBlock(title: "This album", scope: report.album, tint: deck.swatch.lead, emptyText: empty)
+            } else if deck.source == .spotify && !hub.archive.hasHistory && hub.account.isConnected {
+                SpotifySummary(report: report, tint: deck.swatch.lead)
             } else if !report.isEmpty {
                 SummaryRow(report: report, tint: deck.swatch.lead)
             }
@@ -709,11 +768,27 @@ struct ListeningSection: View {
                 if advanced {
                     Quiet(text: hub.archive.hasHistory
                           ? "Export: \(hub.archive.coverage). Plays count listens ≥30 seconds; time includes shorter listens. New plays after the export are not added to these totals."
-                          : "Live API: top 50 rankings and last 50 plays, not lifetime totals. Import Extended Streaming History for full-account totals.")
+                          : "Spotify rankings reflect affinity, not play counts. Missing from a returned list does not mean never played.")
                     Button(hub.archive.busy ? "Importing…" : "Import full Spotify history…") { hub.importSpotifyHistory() }
                         .buttonStyle(.plain).font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(deck.swatch.lead)
                         .disabled(hub.archive.busy || hub.archive.loading)
+                }
+                if !hub.archive.hasHistory {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(hub.prefs.exportRequested ? "Full history requested" : "Full history not imported")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                            .help("Your saved reminder, not a live Spotify processing status.")
+                        Spacer(minLength: 0)
+                        Button("Import when ready") { hub.importSpotifyHistory() }
+                            .buttonStyle(.plain).font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(deck.swatch.lead)
+                            .disabled(hub.archive.busy || hub.archive.loading)
+                    }
+                    if !hub.prefs.exportRequested {
+                        Button("I've requested it") { hub.prefs.exportRequested = true }
+                            .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
                 }
             }
             prompt(report.prompt)
@@ -753,6 +828,29 @@ struct ListeningSection: View {
             Spacer(minLength: 0)
             Button(label) { hub.askToConnectSpotify() }.controlSize(.small)
         }
+    }
+}
+
+/// Compact interim rows; absent results never become zero or lifetime claims.
+struct SpotifySummary: View {
+    let report: ListeningReport
+    let tint: Color
+    var body: some View {
+        VStack(spacing: 5) {
+            row("Artist ranking", report.artist.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
+            row("Song ranking", report.song.tiles.first { $0.caption.hasPrefix("Spotify ranking") }?.value ?? "Not in returned list")
+            row("Last recent play", report.song.tiles.first { $0.caption == "last in recent history" }?.value ?? "Not in recent history")
+            Text("Recent history only · not lifetime totals")
+                .font(.system(size: 9)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value).foregroundStyle(tint).fontWeight(.semibold)
+        }.font(.system(size: 11))
     }
 }
 

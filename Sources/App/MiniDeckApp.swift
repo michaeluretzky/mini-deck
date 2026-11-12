@@ -217,6 +217,8 @@ enum PrefKey {
     static let choice = "minideck.source"
     static let countPlays = "minideck.countPlays"
     static let statsAdvanced = "minideck.statsAdvanced"
+    static let spotifySpan = "minideck.spotifySpan"
+    static let exportRequested = "minideck.exportRequested"
 }
 
 @MainActor @Observable
@@ -233,6 +235,12 @@ final class Prefs {
     var statsAdvanced: Bool {
         didSet { UserDefaults.standard.set(statsAdvanced, forKey: PrefKey.statsAdvanced) }
     }
+    var spotifySpan: SpotifyAccount.Span {
+        didSet { UserDefaults.standard.set(spotifySpan.rawValue, forKey: PrefKey.spotifySpan) }
+    }
+    var exportRequested: Bool {
+        didSet { UserDefaults.standard.set(exportRequested, forKey: PrefKey.exportRequested) }
+    }
     private(set) var openAtLogin: Bool
 
     init() {
@@ -241,6 +249,8 @@ final class Prefs {
         choice = store.string(forKey: PrefKey.choice).flatMap(SourceChoice.init(rawValue:)) ?? .automatic
         countPlays = store.object(forKey: PrefKey.countPlays) as? Bool ?? true
         statsAdvanced = store.bool(forKey: PrefKey.statsAdvanced)
+        spotifySpan = store.string(forKey: PrefKey.spotifySpan).flatMap(SpotifyAccount.Span.init(rawValue:)) ?? .short
+        exportRequested = store.bool(forKey: PrefKey.exportRequested)
         openAtLogin = SMAppService.mainApp.status == .enabled
         if !store.bool(forKey: PrefKey.loginSeeded) {
             store.set(true, forKey: PrefKey.loginSeeded)

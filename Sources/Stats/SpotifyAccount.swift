@@ -73,6 +73,7 @@ final class SpotifyAccount {
     /// Ordered top lists for the history window.
     private(set) var topSongs: [Span: [Ranked]] = [:]
     private(set) var topArtists: [Span: [Ranked]] = [:]
+    private(set) var currentAlbum: (trackID: String, album: WebAlbum)?
     private(set) var updated: Date?
 
     @ObservationIgnored var onNotice: ((String) -> Void)?
@@ -100,8 +101,9 @@ final class SpotifyAccount {
         guard parts.count == 3, parts[0] == "spotify", parts[1] == "track" else { return nil }
         let id = String(parts[2])
         guard id.count == 22, id.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }),
-              let song = await get("/tracks/\(id)", WebTrack.self),
-              let artist = song.artists.first(where: { TitleTidy.key($0.name) == TitleTidy.key(creditedArtist) }),
+              let song = await get("/tracks/\(id)", WebTrack.self) else { return nil }
+        if let album = song.album { currentAlbum = (track.trackID, album) }
+        guard let artist = song.artists.first(where: { TitleTidy.key($0.name) == TitleTidy.key(creditedArtist) }),
               let artistID = artist.id, let url = AudiencePages.artistURL(id: artistID) else { return nil }
         return await AudiencePages.shared.read(artist: creditedArtist, url: url)
     }
@@ -164,6 +166,7 @@ final class SpotifyAccount {
         recent = []
         topSongs = [:]
         topArtists = [:]
+        currentAlbum = nil
         updated = nil
         topFetched = .distantPast
         recentFetched = .distantPast
@@ -261,9 +264,9 @@ final class SpotifyAccount {
         }
         if wantRecent || wantTop, let r = await get("/me/player/recently-played?limit=50", Paging<WebPlay>.self) {
             recent = r.items.compactMap { item in
-                guard let id = item.track.id else { return nil }
+                guard let id = item.track.id, let playedAt = Self.parseDate(item.played_at) else { return nil }
                 return Play(trackID: id, artistKeys: item.track.artists.map { TitleTidy.key($0.name) },
-                            at: Self.parseDate(item.played_at) ?? .distantPast,
+                            at: playedAt,
                             title: item.track.name, artist: Self.names(item.track.artists),
                             album: item.track.album?.name ?? "")
             }
@@ -403,7 +406,12 @@ final class SpotifyAccount {
 
 struct Paging<T: Decodable & Sendable>: Decodable, Sendable { let items: [T] }
 struct WebArtist: Decodable, Sendable { let id: String?; let name: String }
-struct WebAlbum: Decodable, Sendable { let id: String?; let name: String }
+struct WebAlbum: Decodable, Sendable {
+    let id: String?
+    let name: String
+    let release_date: String?
+    let total_tracks: Int?
+}
 struct WebTrack: Decodable, Sendable { let id: String?; let name: String; let artists: [WebArtist]; let album: WebAlbum? }
 struct WebPlay: Decodable, Sendable { let track: WebTrack; let played_at: String }
 

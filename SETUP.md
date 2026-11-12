@@ -27,6 +27,10 @@ Mini Deck does not silently create Spotify developer apps, accept terms, authori
 
 ## Full history import
 
+While waiting for your export, mark **I've requested my full history** in **Setup & Help > Full account history**. The card then shows **Full history requested** and **Import when ready**. This reminder is stored on this Mac, is off by default, and can be unchecked at any time. It does not monitor Spotify or estimate delivery.
+
+If Spotify is connected, select an approximate 4-week, 6-month or 12-month ranking period in **Your Spotify**. Artist and song positions are Spotify affinity rankings, not play counts. **Last recent play** means the latest returned timestamp for the current song, not a complete account-history search. A missing result does not mean you have never played it. The API supplies rankings and a limited recent list ([top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks), [recently played](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
+
 Use **Listening Stats > Import Full Spotify History…**, or the interactive guide's **Choose history files…** button.
 
 - **Select all relevant audio files:** `Streaming_History_Audio*.json` or older `endsong*.json` extended-history files. A containing folder can also be selected.
