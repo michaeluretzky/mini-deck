@@ -36,6 +36,7 @@ final class Hub {
     static let shared = Hub()
 
     let prefs = Prefs()
+    let cardSizing = CardSizing()
     let deck = Deck()
     let pointer = Pointer()
     let spectrum = Spectrum()
@@ -115,6 +116,7 @@ final class Hub {
     func setCompact(_ compact: Bool) {
         guard prefs.compactView != compact else { return }
         pointer.resetLayout()
+        cardSizing.reset(compact: compact)
         prefs.compactView = compact
     }
 

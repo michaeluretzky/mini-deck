@@ -22,7 +22,6 @@ struct DeckRoot: View {
 }
 
 struct DeckCard: View {
-    @State private var playerHeight: CGFloat = 132
     let hub: Hub
     let deck: Deck
     let pointer: Pointer
@@ -50,14 +49,14 @@ struct DeckCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(GeometryReader { g in
-                Color.clear.onChange(of: g.size.height, initial: true) { _, height in playerHeight = height }
+                Color.clear.onChange(of: g.size.height, initial: true) { _, height in hub.cardSizing.playerHeight = height }
             })
             if pointer.drawerOpen && deck.hasTrack {
                 Capsule()
                     .fill(LinearGradient(colors: [sw.lead.opacity(0.45), sw.echo.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 1)
-                BoundedDrawer(limit: max(60, stage.maxPanelHeight - playerHeight - 2 * Metrics.halo
-                                         - (prefs.compactView ? 37 : 49))) {
+                BoundedDrawer(limit: max(60, stage.maxPanelHeight - hub.cardSizing.playerHeight - 2 * Metrics.halo
+                                         - (prefs.compactView ? 37 : 49)), sizing: hub.cardSizing) {
                     if prefs.compactView {
                         CompactInfoDrawer(deck: deck, account: hub.account)
                     } else {

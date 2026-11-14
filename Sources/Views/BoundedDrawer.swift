@@ -3,11 +3,23 @@
 
 import SwiftUI
 
+/// Persist geometry with the app, without requiring the newer SwiftUI State macro plugin.
+@MainActor @Observable
+final class CardSizing {
+    var playerHeight: CGFloat = 132
+    var drawerHeight: CGFloat = 1
+
+    func reset(compact: Bool) {
+        playerHeight = compact ? 60 : 132
+        drawerHeight = 1
+    }
+}
+
 /// Measure natural content once per change; only overflow becomes scrollable.
 struct BoundedDrawer<Content: View>: View {
     let limit: CGFloat
+    let sizing: CardSizing
     @ViewBuilder let content: () -> Content
-    @State private var contentHeight: CGFloat = 1
 
     var body: some View {
         ScrollView(.vertical) {
@@ -16,11 +28,11 @@ struct BoundedDrawer<Content: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .background(GeometryReader { geometry in
                     Color.clear.onChange(of: geometry.size.height, initial: true) { _, value in
-                        if abs(contentHeight - value) > 0.5 { contentHeight = value }
+                        if abs(sizing.drawerHeight - value) > 0.5 { sizing.drawerHeight = value }
                     }
                 })
         }
-        .scrollDisabled(contentHeight <= limit)
-        .frame(height: min(contentHeight, limit))
+        .scrollDisabled(sizing.drawerHeight <= limit)
+        .frame(height: min(sizing.drawerHeight, limit))
     }
 }
