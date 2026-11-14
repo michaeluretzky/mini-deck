@@ -8,9 +8,9 @@ struct CompactPlayingColumn: View {
     let pointer: Pointer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .top, spacing: 5) {
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .center, spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .center, spacing: 2) {
                     Text(deck.track.title)
                         .font(.system(size: 12.5, weight: .bold))
                         .lineLimit(1)
@@ -19,7 +19,9 @@ struct CompactPlayingColumn: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 25)
+                .frame(maxWidth: .infinity)
                 ServiceBadge(deck: deck)
             }
             HStack(spacing: 4) {
@@ -27,8 +29,8 @@ struct CompactPlayingColumn: View {
                 control(deck.isPlaying ? "pause.fill" : "play.fill",
                         label: deck.isPlaying ? "Pause" : "Play", action: deck.togglePlay)
                 control("forward.end.fill", label: "Next track", action: deck.skipForward)
-                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity)
             .zone(Zone.transport, pointer)
         }
     }
@@ -44,6 +46,28 @@ struct CompactPlayingColumn: View {
         .buttonStyle(Squish())
         .help(label)
         .accessibilityLabel(label)
+    }
+}
+
+/// A compact, non-interactive progress strip; keeps dragging the widget predictable.
+struct CompactProgress: View {
+    let deck: Deck
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: deck.isPlaying ? 0.5 : 30)) { context in
+            GeometryReader { geometry in
+                let fraction = deck.track.length > 0
+                    ? min(1, max(0, deck.elapsed(at: context.date) / deck.track.length)) : 0
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.16))
+                    Capsule().fill(deck.swatch.lead)
+                        .frame(width: max(0, geometry.size.width * fraction))
+                }
+                .accessibilityLabel("Playback progress")
+                .accessibilityValue("\(Int(fraction * 100)) percent")
+            }
+            .frame(height: 3)
+        }
     }
 }
 

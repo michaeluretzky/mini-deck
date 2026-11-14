@@ -19,7 +19,7 @@ Spotify describes Extended Streaming History as account-lifetime data. The regul
 - **Playback:** Mini Deck follows the running music app and current track.
 - **Setup checks:** The guide reports detected apps, active playback, connection state, import totals, and selected auto-import folder.
 - **Saved account access:** An existing Spotify connection is reused and refreshed without pasting the Client ID again.
-- **Live account stats:** Recent plays are refreshed while Mini Deck runs; top lists refresh on their own interval. These are account data, never combined with Mac-only counts.
+- **Ongoing Spotify history:** Recording starts when Mini Deck first runs. Observed Spotify playback and available recent account records are saved privately and reconciled with imported history. Account polling runs at startup and about every two minutes; keep Mini Deck running and connected for other-device playback.
 - **Optional auto-import:** After you explicitly select an export folder, Mini Deck checks that folder every 30 seconds. Recognized JSON files must remain stable across two checks before import. Repeated and overlapping exports are deduplicated.
 - **Privacy filtering:** Raw IP addresses, locations, platforms and usernames are discarded during import. No history files are uploaded.
 
@@ -36,11 +36,11 @@ Use **Listening Stats > Import Full Spotify History…**, or the interactive gui
 - **Select all relevant audio files:** `Streaming_History_Audio*.json` or older `endsong*.json` extended-history files. A containing folder can also be selected.
 - **Unzip first:** ZIP archives are not imported directly.
 - **Check coverage:** Mini Deck shows the earliest and latest imported timestamps. Missing files mean partial history; it cannot prove that you selected the complete account export.
-- **Understand totals:** Plays require at least 30 seconds. Actual listened time includes shorter listens. Podcasts/video records are not included in music totals.
-- **Refresh later:** Import a newer export to extend historical totals. Live recent API plays stay separate because the API lacks actual listened milliseconds and does not provide a lifetime event archive.
+- **Understand totals:** Overall plays include every valid music record, including short listens. Observed playback starts count once per session. Known listening time excludes API-only records, which do not include actual listened duration. Non-music records are excluded.
+- **Refresh later:** Import a newer export to replace the covered portion of ongoing history. Forward records after the export cutoff remain included. Missing export files and closed/offline periods can leave gaps; the app does not claim complete lifetime coverage.
 - **Batch large exports:** Limit each file to 64 MB and each import batch to 256 MB. Import multiple batches when necessary.
 
-Imported totals appear in the compact card, with additional details under **Show advanced**. The **Spotify import** tab in Listening History shows recent records and top songs/artists/albums; list displays are capped at 100 rows, but totals use all imported records.
+Combined totals appear in the normal card, with additional details under **Show advanced**. The **Spotify history** tab shows recent records and top songs/artists/albums; list displays are capped at 100 rows, but totals use all saved records. Double-click compact mode intentionally shows only song/artist details, centered controls, and a thin playback bar.
 
 ### Historical song data
 

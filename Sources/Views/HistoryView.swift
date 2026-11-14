@@ -10,7 +10,7 @@ enum HistorySource: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .spotify: "Spotify"
-        case .archive: "Spotify import"
+        case .archive: "Spotify history"
         case .music: "Apple Music"
         case .mac: "This Mac"
         }
@@ -131,7 +131,7 @@ enum HistoryBook {
         if list == .recent {
             page.rows = snapshot.events.suffix(100).reversed().map {
                 HistoryRow(rank: nil, title: $0.title, subtitle: $0.artist,
-                           detail: "\(Int($0.milliseconds / 1000)) sec · \(StatsBook.ago($0.ended))")
+                           detail: "\($0.durationKnown == false ? "Duration unavailable" : "\(Int($0.milliseconds / 1000)) sec") · \(StatsBook.ago($0.ended))")
             }
         } else {
             let totals: [SpotifyArchive.Total]
@@ -149,7 +149,7 @@ enum HistoryBook {
                     detail: "\(item.plays) plays · \(item.seconds < 60 ? "\(Int(item.seconds)) sec" : StatsBook.duration(item.seconds))")
             }
         }
-        page.note = "\(snapshot.events.count) imported music records · \(archive.coverage) · all devices. Showing up to 100 rows. Plays require ≥30 seconds; time includes shorter listens. Totals are limited to the files imported and do not include later API plays."
+        page.note = "\(snapshot.events.count) overall plays · \(archive.coverage). Showing up to 100 rows. \(archive.syncNote)"
         return page
     }
 
@@ -194,7 +194,7 @@ enum HistoryBook {
     private static func mac(_ list: HistoryList, log: ListeningLog, counting: Bool) -> HistoryPage {
         var page = HistoryPage()
         if log.isEmpty {
-            page.empty = .message(counting ? "Mini Deck hasn't counted any plays yet. A song counts after 30 seconds."
+            page.empty = .message(counting ? "Mini Deck hasn't recorded any plays yet. Playback starts count, including brief listens."
                                            : "Turn on Count Plays on This Mac in the menu bar to build this history.")
             return page
         }

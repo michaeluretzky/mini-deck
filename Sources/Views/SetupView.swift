@@ -232,7 +232,7 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Ready when you are").font(.title2.bold())
             instruction("Nothing playing on the card?", "Play a song in the desktop Spotify or Music app. Set Follow to Automatic in Mini Deck's menu. In macOS Privacy & Security > Automation, check Mini Deck's access to that music app.")
-            instruction("History looks incomplete?", "Live Spotify stats cover recent plays and top lists, not your lifetime totals. Import every audio JSON file from Extended Streaming History. The displayed coverage is the imported files' range, not a guarantee that every file was supplied.")
+            instruction("History looks incomplete?", "Import every music-history file, then keep Mini Deck running. Ongoing Spotify playback is saved from first launch; connect Spotify for available recent playback from other devices. Closed/offline periods or missing files may leave gaps. Overall plays include short listens; API-only duration is unknown.")
             instruction("Automatic import hasn't run?", "Choose a folder containing extracted JSON files, not a ZIP. Files must be stable across two checks, about 30 seconds apart. Folder permissions can be renewed by choosing it again.")
             instruction("Spotify refuses access?", "Check the exact redirect URI, app-owner Premium status, and User Management allowlist. A development app is not an unrestricted public sign-in service.")
             instruction("Monthly listeners show a link?", "Spotify's public page did not supply verifiable listener metadata. Open the link to view the artist in Spotify. Apple Music's public artist API does not supply monthly listeners. Followers are never substituted.")

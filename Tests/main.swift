@@ -129,7 +129,7 @@ await MainActor.run {
     }
     expect(log.song(artist: "Neon Coast", title: "Night Drive")?.seconds == 78, "listening time adds up")
     let song = log.song(artist: "Neon Coast", title: "Night Drive")
-    expect(song?.plays == 1, "a play counts after 30 seconds")
+    expect(song?.plays == 1, "one playback session counts once")
     expect(song?.album == "City Lights", "album saved with the song")
     expect(log.songs(byArtist: "neon coast").count == 1, "songs by artist")
     expect(log.songs(onAlbum: "City Lights", artists: ["Neon Coast"]).count == 1, "songs on album")
@@ -205,14 +205,14 @@ await MainActor.run {
         expect(indexed.events.count == 3, "overlapping/repeated imports are deduplicated")
         expect(indexed.songs.count == 2, "export song grouping")
         let song = indexed.songs[remoteTrack.trackID]
-        expect(song?.plays == 1, "sub-30-second listen not a qualifying play")
+        expect(song?.plays == 2, "short listens count as overall plays")
         expect(song?.milliseconds == 190000, "short listens still contribute actual listening time")
-        expect(indexed.artists[TitleTidy.key("The Band")]?.plays == 2, "account-wide artist plays")
-        expect(indexed.albums.values.first?.plays == 2, "account-wide album plays")
+        expect(indexed.artists[TitleTidy.key("The Band")]?.plays == 3, "account-wide artist plays")
+        expect(indexed.albums.values.first?.plays == 3, "account-wide album plays")
         let report = StatsBook.importedReport(track: remoteTrack, snapshot: indexed, coverage: "test export")
-        expect(report.song.tiles.first?.value == "1", "imported song stats shown")
-        expect(report.artist.tiles.first?.value == "2", "imported artist stats shown")
-        expect(report.album.tiles.first?.value == "2", "imported album stats shown")
+        expect(report.song.tiles.first?.value == "2", "imported song stats shown")
+        expect(report.artist.tiles.first?.value == "3", "imported artist stats shown")
+        expect(report.album.tiles.first?.value == "3", "imported album stats shown")
         expect(report.song.caption.contains("all devices") && report.song.caption.contains("test export"), "import coverage labeled")
         let saved = String(data: (try? JSONEncoder().encode(indexed.events)) ?? Data(), encoding: .utf8) ?? ""
         expect(!saved.contains("PRIVATE") && !saved.contains("platform") && !saved.contains("ip_addr"), "sensitive export fields stripped")
@@ -222,6 +222,55 @@ await MainActor.run {
     expect((try? SpotifyArchive.parse(Data(#"[{"endTime":"2020-01-01 12:00","msPlayed":100}]"#.utf8))) == nil,
            "standard account export not mislabeled lifetime history")
     expect((try? SpotifyArchive.parse(Data("not json".utf8))) == nil, "malformed export rejected")
+
+    // MARK: Forward collection and cross-source reconciliation
+    let baseTime = Date(timeIntervalSince1970: 1_700_000_000)
+    var journal = SpotifyJournal()
+    var current = remoteTrack
+    current.state = .playing
+    current.position = 0
+    expect(journal.observe(current, now: baseTime), "first observed playback starts a play immediately")
+    current.position = 2
+    expect(!journal.observe(current, now: baseTime.addingTimeInterval(2)), "polling does not add another play")
+    expect(journal.records.first?.milliseconds == 2000, "only observed elapsed time is measured")
+    current.state = .paused
+    _ = journal.observe(current, now: baseTime.addingTimeInterval(3))
+    current.state = .playing
+    _ = journal.observe(current, now: baseTime.addingTimeInterval(30))
+    expect(journal.records.count == 1 && journal.records[0].milliseconds == 2000, "pause and resume add no play or paused time")
+    current.position = 8
+    _ = journal.observe(current, now: baseTime.addingTimeInterval(32))
+    current.position = 0
+    _ = journal.observe(current, now: baseTime.addingTimeInterval(34))
+    expect(journal.records.count == 2, "replaying the same song starts a separate session")
+    let apiPlay = SpotifyAccount.Play(trackID: "0123456789012345678901", artistKeys: [],
+                                     at: baseTime, title: current.title, artist: current.artist, album: current.album)
+    journal.ingest([apiPlay, apiPlay], now: baseTime.addingTimeInterval(36))
+    journal.ingest([apiPlay], now: baseTime.addingTimeInterval(37))
+    expect(journal.records.filter { $0.kind == "api" }.count == 1, "API IDs survive overlapping polls")
+    expect(journal.additions(after: nil).count == 2, "API and observed sessions reconcile one-to-one")
+    expect(journal.additions(after: baseTime.addingTimeInterval(33)).count == 1, "newer export replaces covered forward history")
+    let apiOnly = SpotifyAccount.Play(trackID: "newremote", artistKeys: [], at: baseTime.addingTimeInterval(90),
+                                     title: "Phone song", artist: "Phone artist", album: "Phone album")
+    journal.ingest([apiOnly], now: baseTime.addingTimeInterval(100))
+    let additions = journal.additions(after: nil)
+    expect(additions.count == 3, "other-device API playback adds an overall play")
+    expect(additions.last?.milliseconds == 0 && additions.last?.durationKnown == false, "API track length is never invented listened time")
+    let combined = SpotifyArchive.combined(SpotifyArchive.Snapshot(), additions: additions)
+    expect(combined.songs[current.trackID]?.plays == 2, "combined song totals include forward playback")
+    expect(combined.topSongs.first?.plays == 2, "combined rankings update without re-reading the export")
+    let serialized = try? JSONEncoder().encode(journal)
+    var restoredJournal = serialized.flatMap { try? JSONDecoder().decode(SpotifyJournal.self, from: $0) }
+    expect(restoredJournal?.additions(after: nil) == additions, "forward history survives restart")
+    restoredJournal?.ingest([apiOnly], now: baseTime.addingTimeInterval(101))
+    expect(restoredJournal?.additions(after: nil).count == 3, "restart does not duplicate repeated API records")
+    var onlyMusic = SpotifyJournal()
+    current.source = .music
+    _ = onlyMusic.observe(current, now: baseTime)
+    expect(onlyMusic.records.isEmpty, "Apple Music never enters Spotify totals")
+    let brief = ListeningLog(persist: false)
+    brief.tick(current, now: baseTime)
+    expect(brief.song(artist: current.primaryArtist, title: current.title)?.plays == 1, "Mac totals also count brief playback immediately")
 
     // Artist audience: never confuse followers or another artist's biography with monthly listeners.
     expect(AudiencePages.monthlyListeners(in: #"<meta property="og:description" content="Artist · 25.4M monthly listeners.">"#) == "25.4M",
@@ -322,6 +371,42 @@ func checkImportPersistence() async {
     } catch {
         expect(false, "import persistence test: \(error.localizedDescription)")
     }
+}
+
+@MainActor
+func checkOngoingPersistence() async {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("MiniDeck-forward-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    do {
+        let destination = folder.appendingPathComponent("spotify-import.json")
+        let archive = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where archive.loading { try await Task.sleep(for: .milliseconds(10)) }
+        var track = Snapshot()
+        track.state = .playing
+        track.source = .spotify
+        track.trackID = "spotify:track:test"
+        track.title = "Short listen"
+        track.artist = "Test artist"
+        archive.observe(track)
+        archive.flush()
+        let liveURL = folder.appendingPathComponent("spotify-live.json")
+        let permissions = try FileManager.default.attributesOfItem(atPath: liveURL.path)
+        expect((permissions[.posixPermissions] as? NSNumber)?.intValue == 0o600, "forward journal is user-readable only")
+        expect(!FileManager.default.fileExists(atPath: destination.path), "ongoing recording never overwrites the export file")
+        let reopened = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where reopened.loading { try await Task.sleep(for: .milliseconds(10)) }
+        expect(reopened.snapshot.songs[track.trackID]?.plays == 1, "normal saved-history totals load forward plays without reimport")
+        expect(reopened.snapshot.songs[track.trackID]?.milliseconds == 0, "brief observed start has no invented duration")
+        for _ in 0..<300 where archive.snapshot.events.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        expect(archive.snapshot.events.count == 1, "debounced forward index publishes into normal history")
+        try Data("damaged".utf8).write(to: liveURL)
+        let damaged = SpotifyArchive(storageURL: destination)
+        for _ in 0..<200 where damaged.loading { try await Task.sleep(for: .milliseconds(10)) }
+        damaged.observe(track)
+        damaged.flush()
+        expect(damaged.syncError != nil, "unreadable forward journal shows a sync error")
+        expect(try String(contentsOf: liveURL, encoding: .utf8) == "damaged", "damaged journal is never silently overwritten")
+    } catch { expect(false, "forward persistence: \(error.localizedDescription)") }
 }
 
 @MainActor
@@ -502,6 +587,7 @@ func checkWrapped() async {
 }
 
 await checkImportPersistence()
+await checkOngoingPersistence()
 await checkWrapped()
 await checkPointer()
 print("\(checks - failures)/\(checks) checks passed")

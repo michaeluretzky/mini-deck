@@ -22,6 +22,7 @@ secrets*
 credentials*
 listening.json
 spotify-import.json
+spotify-live.json
 wrapped*.json
 *Wrapped*.json
 Streaming_History*.json

@@ -77,6 +77,8 @@ final class SpotifyAccount {
     private(set) var updated: Date?
 
     @ObservationIgnored var onNotice: ((String) -> Void)?
+    @ObservationIgnored var onRecent: (([Play], Bool) -> Void)?
+    @ObservationIgnored var historyBoundary: (() -> Date?)?
     @ObservationIgnored private var stored: Vault.Entry?
     @ObservationIgnored private var access: (token: String, until: Date)?
     @ObservationIgnored private var catcher: LoopbackCatcher?
@@ -262,14 +264,31 @@ final class SpotifyAccount {
             topArtists = artists
             topFetched = now
         }
-        if wantRecent || wantTop, let r = await get("/me/player/recently-played?limit=50", Paging<WebPlay>.self) {
-            recent = r.items.compactMap { item in
+        if wantRecent || wantTop {
+            let boundary = historyBoundary?() ?? Date().addingTimeInterval(-86_400)
+            var path = "/me/player/recently-played?limit=50"
+            var collected: [Play] = []
+            var previousOldest: Date?
+            var complete = false
+            // Bounded catch-up with overlap; saved IDs deduplicate repeat polls.
+            for page in 0..<20 {
+                guard let r = await get(path, Paging<WebPlay>.self) else { break }
+                let batch: [Play] = r.items.compactMap { item in
                 guard let id = item.track.id, let playedAt = Self.parseDate(item.played_at) else { return nil }
                 return Play(trackID: id, artistKeys: item.track.artists.map { TitleTidy.key($0.name) },
                             at: playedAt,
                             title: item.track.name, artist: Self.names(item.track.artists),
                             album: item.track.album?.name ?? "")
+                }
+                if page == 0 { recent = batch }
+                collected += batch
+                guard let oldest = batch.map(\.at).min() else { complete = true; break }
+                if oldest <= boundary || r.items.count < 50 { complete = true; break }
+                if let previousOldest, oldest >= previousOldest { break }
+                previousOldest = oldest
+                path = "/me/player/recently-played?limit=50&before=\(Int64(oldest.timeIntervalSince1970 * 1000))"
             }
+            onRecent?(collected, complete)
             recentFetched = now
         }
         updated = now

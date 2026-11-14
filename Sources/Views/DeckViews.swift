@@ -51,12 +51,15 @@ struct DeckCard: View {
             .background(GeometryReader { g in
                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in hub.cardSizing.playerHeight = height }
             })
+            if prefs.compactView && deck.hasTrack {
+                CompactProgress(deck: deck)
+            }
             if pointer.drawerOpen && deck.hasTrack {
                 Capsule()
                     .fill(LinearGradient(colors: [sw.lead.opacity(0.45), sw.echo.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 1)
                 BoundedDrawer(limit: max(60, stage.maxPanelHeight - hub.cardSizing.playerHeight - 2 * Metrics.halo
-                                         - (prefs.compactView ? 37 : 49)), sizing: hub.cardSizing) {
+                                         - (prefs.compactView ? 48 : 49)), sizing: hub.cardSizing) {
                     if prefs.compactView {
                         CompactInfoDrawer(deck: deck, account: hub.account)
                     } else {
@@ -803,11 +806,11 @@ struct ListeningSection: View {
                 SummaryRow(report: report, tint: deck.swatch.lead)
             }
             if deck.source == .spotify {
-                Text(hub.archive.hasHistory ? "Imported Spotify history · all devices" : "Spotify account · all devices")
+                Text(hub.archive.hasHistory ? "Saved Spotify history · export + ongoing records" : "Spotify account · all devices")
                     .font(.system(size: 9)).foregroundStyle(.secondary)
                 if advanced {
                     Quiet(text: hub.archive.hasHistory
-                          ? "Export: \(hub.archive.coverage). Plays count listens ≥30 seconds; time includes shorter listens. New plays after the export are not added to these totals."
+                          ? "History: \(hub.archive.coverage). \(hub.archive.syncNote)"
                           : "Rankings reflect affinity. Historical years are partial records, not play counts or exact listening dates.")
                     Button(hub.archive.busy ? "Importing…" : "Import full Spotify history…") { hub.importSpotifyHistory() }
                         .buttonStyle(.plain).font(.system(size: 10, weight: .semibold))

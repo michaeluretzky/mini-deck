@@ -31,9 +31,6 @@ final class ListeningLog {
         var artists: [String: Artist] = [:]
     }
 
-    /// A song counts as played after this much listening, the same bar most services use.
-    static let playThreshold: Double = 30
-
     private(set) var book: Book
     var enabled = true {
         didSet { if !enabled { lastTick = nil } }
@@ -67,7 +64,7 @@ final class ListeningLog {
         }
         let songKey = Self.songKey(artist: snap.primaryArtist, title: snap.title)
         let artistKey = Self.artistKey(snap.primaryArtist)
-        let restarted = counted && snap.position < 5 && lastPosition > Self.playThreshold
+        let restarted = counted && snap.position < 3 && lastPosition > snap.position + 3
         if songKey != listenKey || restarted {
             listenKey = songKey
             heard = 0
@@ -76,7 +73,7 @@ final class ListeningLog {
         lastPosition = snap.position
         let delta = lastTick.map { min(max(0, now.timeIntervalSince($0)), 2) } ?? 0
         lastTick = now
-        guard delta > 0 else { return }
+        guard delta > 0 || !counted else { return }
 
         heard += delta
         var song = book.songs[songKey] ?? Song(title: snap.title, artist: snap.primaryArtist, first: now, last: now)
@@ -85,7 +82,7 @@ final class ListeningLog {
         song.last = now
         if !snap.album.isEmpty { song.album = snap.album }
         artist.seconds += delta
-        if !counted && heard >= Self.playThreshold {
+        if !counted {
             counted = true
             song.plays += 1
             artist.plays += 1

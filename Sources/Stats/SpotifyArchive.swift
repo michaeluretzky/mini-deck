@@ -14,6 +14,7 @@ final class SpotifyArchive {
         let artist: String
         let album: String
         let uri: String
+        var durationKnown: Bool? = nil
         var songKey: String { uri.isEmpty ? [artist, title, album].map(SpotifyArchive.nameKey).joined(separator: "\u{1F}") : uri }
         var albumKey: String { SpotifyArchive.nameKey(artist) + "\u{1F}" + SpotifyArchive.nameKey(album) }
         var identity: String {
@@ -32,8 +33,8 @@ final class SpotifyArchive {
         var last: Date
         var seconds: Double { Double(milliseconds) / 1000 }
         mutating func add(_ event: Event) {
-            // A transparent app definition, not a claim about Spotify royalties.
-            if event.milliseconds >= 30_000 { plays += 1 }
+            // Every supplied music event is an overall play, including short listens.
+            plays += 1
             milliseconds += event.milliseconds
             first = min(first, event.ended)
             last = max(last, event.ended)
@@ -90,6 +91,12 @@ final class SpotifyArchive {
     private(set) var message = ""
     private(set) var watchedFolderName: String?
     private(set) var loadError: String?
+    private(set) var syncError: String?
+    private(set) var journal = SpotifyJournal()
+    @ObservationIgnored private var imported = Snapshot()
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var lastRefresh = Date.distantPast
+    @ObservationIgnored private var revision = 0
     @ObservationIgnored private let storageURL: URL?
     @ObservationIgnored private var watcher: Task<Void, Never>?
     private static let watchKey = "minideck.spotifyExportFolder"
@@ -105,7 +112,19 @@ final class SpotifyArchive {
                           let events = try? JSONDecoder().decode([Event].self, from: data) else { return (Snapshot(), true) }
                     return (Self.index(events), false)
                 }.value
-                snapshot = loaded.0
+                imported = loaded.0
+                if let url = journalURL, FileManager.default.fileExists(atPath: url.path) {
+                    if let data = try? Data(contentsOf: url),
+                       let saved = try? JSONDecoder().decode(SpotifyJournal.self, from: data) {
+                        journal = saved
+                    } else {
+                        syncError = "Saved ongoing history could not be read; it has not been overwritten."
+                    }
+                }
+                let base = imported, live = journal
+                snapshot = await Task.detached(priority: .utility) {
+                    Self.combined(base, additions: live.additions(after: base.last))
+                }.value
                 if loaded.1 {
                     loadError = ImportError.savedUnreadable.localizedDescription
                     message = loadError ?? ""
@@ -117,6 +136,71 @@ final class SpotifyArchive {
     }
 
     var hasHistory: Bool { !snapshot.isEmpty }
+    var exportCutoff: Date? { imported.last }
+    var syncNote: String {
+        if let syncError { return syncError }
+        let sync = journal.lastSync.map { "Account checked \(StatsBook.ago($0))." }
+            ?? "Connect Spotify for recent playback from other devices."
+        return "Overall plays include short listens. Export + saved account records + observed Mac playback. \(sync) Listening time includes only measured duration; API-only plays have unknown duration. Gaps while Mini Deck is closed or offline may remain."
+    }
+    private var journalURL: URL? {
+        storageURL?.deletingLastPathComponent().appendingPathComponent("spotify-live.json")
+    }
+
+    func observe(_ track: SwiftSnapshot, now: Date = Date()) {
+        guard !loading, syncError == nil else { return }
+        let newPlay = journal.observe(track, now: now)
+        if newPlay || now.timeIntervalSince(lastRefresh) >= 20 { scheduleRefresh() }
+    }
+
+    func ingestRecent(_ plays: [SpotifyAccount.Play], complete: Bool = true) {
+        guard !loading, syncError == nil else { return }
+        let previous = journal.lastSync
+        journal.ingest(plays, now: Date())
+        if !complete { journal.lastSync = previous }
+        scheduleRefresh()
+    }
+
+    func flush() {
+        guard !loading, syncError == nil, let url = journalURL else { return }
+        do {
+            let fm = FileManager.default
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                   attributes: [.posixPermissions: 0o700])
+            try JSONEncoder().encode(journal).write(to: url, options: [.atomic])
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } catch { syncError = "Ongoing history could not be saved. Check available disk space and folder permissions." }
+    }
+
+    func clearOngoing() throws {
+        guard !loading else { throw ImportError.busy }
+        if let url = journalURL, FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+        journal = SpotifyJournal()
+        syncError = nil
+        scheduleRefresh()
+    }
+
+    private func scheduleRefresh() {
+        revision += 1
+        guard refreshTask == nil else { return }
+        lastRefresh = Date()
+        refreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard let self, !Task.isCancelled else { return }
+            let version = self.revision, base = self.imported, live = self.journal
+            let result = await Task.detached(priority: .utility) {
+                Self.combined(base, additions: live.additions(after: base.last))
+            }.value
+            self.refreshTask = nil
+            if self.revision == version {
+                self.snapshot = result
+                self.lastRefresh = Date()
+                self.flush()
+            } else { self.scheduleRefresh() }
+        }
+    }
     var coverage: String {
         guard let first = snapshot.first, let last = snapshot.last else { return "No Spotify export imported" }
         return "\(StatsBook.shortDate(first)) – \(StatsBook.shortDate(last))"
@@ -127,7 +211,7 @@ final class SpotifyArchive {
         guard loadError == nil else { throw ImportError.savedUnreadable }
         busy = true
         defer { busy = false }
-        let existing = snapshot.events
+        let existing = imported.events
         let destination = storageURL
         let result = try await Task.detached(priority: .userInitiated) {
             let files = try Self.files(in: urls)
@@ -156,7 +240,13 @@ final class SpotifyArchive {
             return (merged, skipped)
         }.value
         let added = result.0.events.count - existing.count
-        snapshot = result.0
+        imported = result.0
+        revision += 1
+        let base = imported, live = journal
+        snapshot = await Task.detached(priority: .utility) {
+            Self.combined(base, additions: live.additions(after: base.last))
+        }.value
+        scheduleRefresh()
         message = "Added \(added) music records; \(result.1) non-music or invalid records skipped. Re-imports are deduplicated."
     }
 
@@ -165,7 +255,9 @@ final class SpotifyArchive {
         if let storageURL, FileManager.default.fileExists(atPath: storageURL.path) {
             try FileManager.default.removeItem(at: storageURL)
         }
-        snapshot = Snapshot()
+        imported = Snapshot()
+        snapshot = Self.combined(imported, additions: journal.additions(after: nil))
+        revision += 1
         message = ""
         loadError = nil
     }
@@ -272,7 +364,28 @@ final class SpotifyArchive {
             snapshot.artists[TitleTidy.key(event.artist), default: seed].add(event)
             if !event.album.isEmpty { snapshot.albums[event.albumKey, default: seed].add(event) }
         }
-        // Build lookup/ranking indexes once on the import/load worker, never on hover.
+        finishIndexes(&snapshot)
+        return snapshot
+    }
+
+    /// Reuse the large export index; only add the smaller forward journal.
+    nonisolated static func combined(_ base: Snapshot, additions: [Event]) -> Snapshot {
+        var snapshot = base
+        snapshot.events += additions
+        for event in additions {
+            let seed = Total(title: event.title, artist: event.artist, album: event.album, first: event.ended, last: event.ended)
+            snapshot.songs[event.songKey, default: seed].add(event)
+            snapshot.artists[TitleTidy.key(event.artist), default: seed].add(event)
+            if !event.album.isEmpty { snapshot.albums[event.albumKey, default: seed].add(event) }
+        }
+        finishIndexes(&snapshot)
+        return snapshot
+    }
+
+    nonisolated private static func finishIndexes(_ snapshot: inout Snapshot) {
+        snapshot.songsByArtist = [:]
+        snapshot.artistRanks = [:]
+        // Build lookup/ranking indexes on the worker, never on hover.
         for song in snapshot.songs.values {
             snapshot.songsByArtist[TitleTidy.key(song.artist), default: []].append(song)
         }
@@ -290,7 +403,6 @@ final class SpotifyArchive {
         snapshot.topSongs = ranked(Array(snapshot.songs.values))
         snapshot.topArtists = ranked(Array(snapshot.artists.values))
         snapshot.topAlbums = ranked(Array(snapshot.albums.values))
-        return snapshot
     }
 
     nonisolated private static func files(in selections: [URL]) throws -> [URL] {

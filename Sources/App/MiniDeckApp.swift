@@ -27,6 +27,7 @@ final class Launcher: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Hub.shared.log.flush()
+        Hub.shared.archive.flush()
     }
 }
 
@@ -56,7 +57,17 @@ final class Hub {
         started = true
         log.enabled = prefs.countPlays
         deck.choice = prefs.choice
-        deck.onTick = { [weak self] snap in self?.log.tick(snap) }
+        deck.onTick = { [weak self] snap in
+            guard let self else { return }
+            self.log.tick(snap)
+            if self.prefs.countPlays { self.archive.observe(snap) }
+        }
+        account.onRecent = { [weak self] plays, complete in self?.archive.ingestRecent(plays, complete: complete) }
+        account.historyBoundary = { [weak self] in
+            guard let self else { return nil }
+            return self.archive.journal.lastSync?.addingTimeInterval(-600)
+                ?? self.archive.exportCutoff ?? self.archive.journal.since
+        }
         deck.onNewTrack = { [weak self] snap in self?.trackChanged(snap) }
         account.onNotice = { [weak self] text in self?.deck.flash("person.crop.circle.badge.checkmark", text) }
         stage.onScaleChange = { [weak self] scale in self?.deck.pixelScale = scale }
@@ -68,9 +79,9 @@ final class Hub {
         followPlayback()
         accountRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(120))
-                guard !Task.isCancelled, let self else { return }
+                guard let self else { return }
                 await self.account.update(trackChanged: true)
+                try? await Task.sleep(for: .seconds(120))
             }
         }
         if !UserDefaults.standard.bool(forKey: "minideck.setupShown") {
@@ -249,6 +260,19 @@ final class Hub {
         }
     }
 
+    func clearOngoingSpotify() {
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = "Clear ongoing Spotify records?"
+        alert.informativeText = "Removes Mini Deck's saved recent-account records and new Spotify playback sessions. Imported files, historical song data, and Spotify are unchanged. Recording resumes while enabled."
+        alert.addButton(withTitle: "Clear Ongoing Records")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try archive.clearOngoing() }
+        catch { deck.flash("exclamationmark.triangle", "Couldn't clear ongoing history") }
+    }
+
     /// The guided flow reuses a bundled registration when available, with a
     /// complete manual fallback and no unsolicited clipboard reads.
     func askToConnectSpotify() {
@@ -341,6 +365,8 @@ struct StatusMenu: View {
         Menu("Listening Stats") {
             Button(hub.archive.busy ? "Importing Spotify History…" : "Import Full Spotify History…") { hub.importSpotifyHistory() }
                 .disabled(hub.archive.busy || hub.archive.loading)
+            Button("Clear Ongoing Spotify Records…") { hub.clearOngoingSpotify() }
+                .disabled(hub.archive.loading)
             Button("Request Spotify Extended History…") {
                 NSWorkspace.shared.open(URL(string: "https://www.spotify.com/account/privacy/")!)
             }

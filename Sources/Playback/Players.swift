@@ -60,6 +60,9 @@ struct Snapshot: Equatable {
     var primaryArtist: String { artist.components(separatedBy: ", ").first ?? artist }
 }
 
+// Disambiguates the playback reading from SpotifyArchive.Snapshot.
+typealias SwiftSnapshot = Snapshot
+
 /// Per-song numbers that the Music app keeps in the user's library.
 struct LibraryFacts: Equatable {
     var plays: Int?

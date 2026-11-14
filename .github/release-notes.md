@@ -1,5 +1,11 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
+Ongoing Spotify history now begins on first launch. Mini Deck privately saves observed Spotify playback and available recent account records, polls at startup and about every two minutes, attempts bounded catch-up, and reconciles local/API duplicates. The combined song, artist, album, and history totals include forward records after the imported export cutoff. A newer export takes precedence through its cutoff. Closed/offline gaps and missing export files can still leave incomplete coverage; this is not a claim of guaranteed full synchronization ([Spotify recent history API](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
+
+All valid music records now count as **overall plays**, including short listens, with no minimum-duration threshold. Listening time uses only known measured duration; API-only records do not invent it. The private ongoing journal survives restarts and has a separate clear control. Existing imports are not modified by this change.
+
+Compact mode now centers the song/artist text and playback controls and adds a thin playback progress bar across the bottom. The small service icon remains at the top-right.
+
 Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotify dates and Apple/MusicBrainz album-note fallbacks share the same format. Dates with only month or year precision remain **September 2020** or **2020**, without invented dates or timezone shifts. Artist birth and formation years are unchanged. Existing private listening data is preserved.
 
 The Spotify or Apple Music service icon now sits at the top-right of the player in a compact 22-point badge. It remains clickable, without a visible “Open…” caption. Removing the old attribution footer reduces the card's bottom space while preserving the track/control spacing.
@@ -22,7 +28,7 @@ First launch now includes an interactive Setup & Help guide with automatic playb
 
 Monthly listeners appear beside the artist heading only when Spotify's public page supplies verifiable metadata; otherwise the heading links to Spotify. Apple Music's public artist API does not provide that count. No followers or popularity scores are substituted.
 
-For historical totals, request **Extended streaming history** in Spotify's Download your data tool, unzip the export, then choose **Listening Stats > Import Full Spotify History…**. Import all relevant audio JSON files. Totals cover the selected files, not later API plays; the date range is shown. [Spotify explains the export coverage here](https://support.spotify.com/us/article/understanding-your-data/).
+For historical totals, request **Extended streaming history** in Spotify's Download your data tool, unzip the export, then choose **Listening Stats > Import Full Spotify History…**. Import all relevant music-history files. Totals combine the selected files with saved forward records after the export cutoff; the date range is shown. [Spotify explains the export coverage here](https://support.spotify.com/us/article/understanding-your-data/).
 
 **Download:** `Mini-Deck-<version>.zip` below. It runs on Apple silicon and Intel Macs with macOS 14 or later.
 

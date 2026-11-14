@@ -53,17 +53,17 @@ Rest the pointer on the cover. Before an export is imported, **Your Spotify** sh
 The **Full history requested** reminder appears only after you mark the request yourself, in the card or Setup & Help. It is not a Spotify status check, has no countdown, can be cleared in Setup & Help, and does not appear by default for new users. **Import when ready** opens the local importer.
 
 - **Spotify account:** account-wide top-song/artist ranks and recent plays, not device-local counts. The API supplies top lists and recent tracks, not lifetime totals ([top items](https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks), [recently played](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
-- **Imported Spotify history:** song, artist and album play totals, actual listening time, top songs and date coverage from the export you select. A play means at least 30 seconds; listening time also includes shorter listens.
+- **Saved Spotify history:** imported music events plus new saved account records and observed Spotify playback. Overall plays include short listens; known listening time excludes API-only records whose duration is unavailable.
 - **Apple Music:** library plays, last played, favorites and library rankings. These are Music library values, not a claim of complete cloud-account history.
 
 | Source | Where the numbers come from | Setup |
 | --- | --- | --- |
 | Spotify account | Returned song/artist rankings for the selected period and up to 50 available recent records across devices, not complete history | Connect once (below) |
 | Apple Music library | Play counts and last-played dates the Music app keeps for every song | None |
-| Spotify import | Music records from Spotify's Extended Streaming History export, across devices | Import the extracted JSON files |
+| Spotify history | Imported records plus ongoing saved account and Mac playback | Import files; keep Mini Deck running and connect Spotify for other devices |
 | This Mac (history window only) | Plays and listening time Mini Deck counts while it runs, for both apps; never mixed into the main card | None. Can be turned off |
 
-The **Listening History** window separates live Spotify data, imported Spotify history, Apple Music, and This Mac. Live Spotify does not show a synthetic top-albums ranking, occurrence counts, listened minutes or first-ever-listen claims. Imported history and Music library statistics remain separate.
+The **Listening History** window separates Spotify API rankings, combined saved Spotify history, Apple Music, and This Mac. API rankings are not play counts. The saved-history totals count deduplicated events, not affinity ranks; Apple Music library statistics remain separate.
 
 The live display uses direct API rankings and recent timestamps, but this is not a claim of Spotify approval. Broader distribution and any derived-listening features require review against [Spotify's Developer Policy](https://developer.spotify.com/policy). Spotify branding is attributed in [Assets/NOTICE.txt](Assets/NOTICE.txt).
 
@@ -78,7 +78,11 @@ Spotify's **Extended streaming history** contains records from the lifetime of y
 
 Import happens locally, without extra API calls. Mini Deck keeps only music names, Spotify track URIs, timestamps and milliseconds listened. It discards IP addresses, usernames, platforms, locations and private-session flags. Podcast/video rows and invalid records are skipped and counted in the import message. Exact duplicate events are ignored when importing overlapping files.
 
-The card prioritizes imported totals and shows the imported date range. Importing only some files produces partial coverage, so Mini Deck never labels an unverified subset as complete lifetime history. Later API plays are **not** merged into export totals: the API and export use different event timing and the API lacks actual listened duration. Re-import a newer export to update historical totals without double-counting.
+The card shows combined saved-history totals and their date range. Recording starts on first launch, not when an unopened download arrives. Mini Deck saves Spotify playback starts observed on this Mac, including short listens, and polls connected-account recent history at startup and about every two minutes. It attempts bounded paginated catch-up, preserves records across restarts, and deduplicates repeat API results. Local/API sessions are matched one-to-one by track and observed time interval; timestamp ambiguity can still affect matching.
+
+An imported export is authoritative through its latest timestamp; only forward records after that cutoff are added. Importing a newer export replaces that covered part of the forward totals without deleting the private journal. Import all export files: a missing file or gap within the export range cannot be repaired by this cutoff rule. API-only records count as plays but do not invent listened duration from track length. The API supplies recent records and cursors, not a guaranteed lifetime archive ([Spotify recent history](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)). Offline/closed-app gaps may remain, and the app does not claim complete synchronization. Keep Mini Deck running for collection; optionally enable Open at Login.
+
+Ongoing history is stored privately as `spotify-live.json`, separately from the unchanged sanitized import. **Listening Stats > Clear Ongoing Spotify Records…** removes that journal without changing your import or Spotify account. Disabling Mac play counting also pauses local forward collection; account collection requires the optional Spotify connection.
 
 The history window displays up to 100 rows per list, with totals computed across every imported music record. Imports accept extracted JSON files/folders, not ZIP archives; limits are 64 MB per file and 256 MB per batch. Import fewer files at a time if needed. Remove the sanitized copy with **Listening Stats > Remove Imported Spotify History…**.
 

@@ -149,36 +149,36 @@ enum StatsBook {
             && (track.album.isEmpty || SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album))
         }
         let album = songs.filter { !track.album.isEmpty && SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album) }
-        let source = "Spotify export · all devices · \(coverage)"
+        let source = "Spotify history · all devices + this Mac · \(coverage)"
         func tiles(_ rows: [SpotifyArchive.Total]) -> [StatTile] {
             guard !rows.isEmpty else { return [] }
             let plays = rows.reduce(0) { $0 + $1.plays }
             let seconds = rows.reduce(0.0) { $0 + $1.seconds }
             let time = seconds < 60 ? "\(Int(seconds)) sec" : duration(seconds)
-            return [StatTile(value: "\(plays)", caption: "plays ≥30 sec", symbol: "play.circle"),
-                    StatTile(value: time, caption: "listened across devices", symbol: "clock")]
+            return [StatTile(value: "\(plays)", caption: "overall plays", symbol: "play.circle"),
+                    StatTile(value: time, caption: "known listening time", symbol: "clock")]
         }
         var songTiles = tiles(Array(matching))
         if let last = matching.map(\.last).max() {
-            songTiles.append(StatTile(value: ago(last), caption: "last in export", symbol: "calendar"))
+            songTiles.append(StatTile(value: ago(last), caption: "last recorded play", symbol: "calendar"))
         }
         out.song.add(songTiles, from: source)
         let artists = keys.compactMap { snapshot.artists[$0] }
         var artistTiles = tiles(artists)
         if let rank = keys.compactMap({ snapshot.artistRanks[$0] }).min() {
-            artistTiles.append(StatTile(value: "#\(rank)", caption: "artist in imported history", symbol: "list.number"))
+            artistTiles.append(StatTile(value: "#\(rank)", caption: "artist in saved history", symbol: "list.number"))
         }
         out.artist.add(artistTiles, from: source)
         var albumTiles = tiles(Array(album))
         if !album.isEmpty {
-            albumTiles.append(StatTile(value: "\(album.count)", caption: "songs in imported history", symbol: "music.note.list"))
+            albumTiles.append(StatTile(value: "\(album.count)", caption: "songs in saved history", symbol: "music.note.list"))
         }
         out.album.add(albumTiles, from: source)
         func lines(_ rows: [SpotifyArchive.Total]) -> [HistoryLine] {
             rows.sorted { $0.plays != $1.plays ? $0.plays > $1.plays : $0.title < $1.title }
                 .prefix(3).map { HistoryLine(title: $0.title, detail: plays($0.plays)) }
         }
-        out.artist.list("Your top songs in the export", lines(Array(songs)), from: source)
+        out.artist.list("Your top songs in saved history", lines(Array(songs)), from: source)
         out.album.list("Your top songs on this album", lines(Array(album)), from: source)
         out.song.trim()
         out.artist.trim()
