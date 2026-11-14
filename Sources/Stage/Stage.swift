@@ -79,6 +79,7 @@ final class Stage {
     @ObservationIgnored private var grab: (mouse: NSPoint, origin: NSPoint)?
     @ObservationIgnored private var pendingFit: (height: CGFloat, width: CGFloat, growDown: Bool)?
     @ObservationIgnored private var fitScheduled = false
+    @ObservationIgnored private var restingFrame: NSRect?
     @ObservationIgnored var onScaleChange: ((CGFloat) -> Void)?
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
@@ -110,6 +111,7 @@ final class Stage {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.onScaleChange?(self.scale)
+                    if self.grab == nil { self.settle() }
                 }
             }
         }
@@ -139,11 +141,9 @@ final class Stage {
 
     private func screen(for frame: NSRect) -> NSScreen? {
         if grab != nil, let s = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) { return s }
-        func overlap(_ s: NSScreen) -> CGFloat {
-            let r = s.frame.intersection(frame)
-            return r.isNull ? 0 : r.width * r.height
-        }
-        return NSScreen.screens.max { overlap($0) < overlap($1) } ?? NSScreen.main
+        let screens = NSScreen.screens
+        guard let index = WindowGeometry.screenIndex(for: frame, screens: screens.map(\.frame)) else { return NSScreen.main }
+        return screens[index]
     }
 
     /// Where the card may sit: the visible screen less a small gap. The glow is allowed to spill past it.
@@ -154,17 +154,8 @@ final class Stage {
 
     private func magnetize(_ f: NSRect, clamp: Bool) -> NSPoint {
         guard let a = playArea(for: f) else { return f.origin }
-        func nearest(_ value: CGFloat, _ stops: [CGFloat]) -> CGFloat {
-            guard let best = stops.min(by: { abs($0 - value) < abs($1 - value) }), abs(best - value) <= Metrics.pull else { return value }
-            return best
-        }
-        var x = nearest(f.minX, [a.minX, a.midX - f.width / 2, a.maxX - f.width])
-        var y = nearest(f.minY, [a.minY, a.maxY - f.height])
-        if clamp {
-            x = min(max(x, a.minX), max(a.minX, a.maxX - f.width))
-            y = min(max(y, a.minY), max(a.minY, a.maxY - f.height))
-        }
-        return NSPoint(x: x.rounded(), y: y.rounded())
+        return WindowGeometry.origin(for: f, in: a, snap: Metrics.pull, clamp: clamp,
+                                     scale: screen(for: f)?.backingScaleFactor ?? scale)
     }
 
     private func glide(to frame: NSRect) {
@@ -178,6 +169,7 @@ final class Stage {
     }
 
     private func remember(_ frame: NSRect) {
+        restingFrame = frame
         UserDefaults.standard.set(NSStringFromPoint(NSPoint(x: frame.minX, y: frame.maxY)), forKey: PrefKey.anchor)
     }
 
@@ -199,6 +191,7 @@ final class Stage {
         guard let panel else { return }
         let mouse = NSEvent.mouseLocation
         if grab == nil {
+            restingFrame = nil
             grab = (mouse, panel.frame.origin)
             NSCursor.closedHand.push()
         }
@@ -220,7 +213,9 @@ final class Stage {
         guard let panel else { return }
         var f = panel.frame
         f.origin = magnetize(f, clamp: true)
-        if f.origin != panel.frame.origin { glide(to: f) } else { remember(f) }
+        // Automatic display correction should not queue an animation behind pointer motion.
+        panel.setFrame(f, display: true, animate: false)
+        remember(f)
     }
 
     func park(at corner: Corner) {
@@ -261,16 +256,16 @@ final class Stage {
         let height = ceil(height * scale) / scale
         let f = panel.frame
         guard abs(f.height - height) > 0.5 || f.width != width else { return }
-        let onBottom = playArea(for: f).map { abs(f.minY - $0.minY) < 2 } ?? false
-        let onRight = playArea(for: f).map { abs(f.maxX - $0.maxX) < 2 } ?? false
-        var next = NSRect(x: onRight ? f.maxX - width : f.minX,
-                          y: (onBottom && !growDown) ? f.minY : f.maxY - height,
-                          width: width, height: height)
-        next.origin = magnetize(next, clamp: true)
+        let base = restingFrame ?? f
+        guard let area = playArea(for: base) else { return }
+        var next = WindowGeometry.resized(base, to: CGSize(width: width, height: height),
+                                          in: area, growDown: growDown)
+        // Stay on the same monitor when expanding; the larger frame must not select a neighbor.
+        next.origin = WindowGeometry.origin(for: next, in: area, snap: Metrics.pull, clamp: true, scale: scale)
         // Content expansion must not start an AppKit animation for every
         // SwiftUI size measurement. Keep gliding only for explicit moves.
         panel.setFrame(next, display: true, animate: false)
-        if next.origin != f.origin { remember(next) }
+        if !growDown { remember(next) }
     }
 }
 

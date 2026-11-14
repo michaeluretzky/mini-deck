@@ -142,7 +142,7 @@ enum StatsBook {
         var out = ListeningReport()
         let keys = Set([track.primaryArtist, track.albumArtist]
             .filter { !$0.isEmpty && $0.caseInsensitiveCompare("Various Artists") != .orderedSame }.map(TitleTidy.key))
-        let songs = snapshot.songs.values.filter { keys.contains(TitleTidy.key($0.artist)) }
+        let songs = keys.flatMap { snapshot.songsByArtist[$0] ?? [] }
         let exact = snapshot.songs[track.trackID]
         let matching = exact.map { [$0] } ?? songs.filter {
             SpotifyArchive.nameKey($0.title) == SpotifyArchive.nameKey(track.title)
@@ -163,13 +163,10 @@ enum StatsBook {
             songTiles.append(StatTile(value: ago(last), caption: "last in export", symbol: "calendar"))
         }
         out.song.add(songTiles, from: source)
-        let artists = snapshot.artists.filter { keys.contains($0.key) }.map(\.value)
+        let artists = keys.compactMap { snapshot.artists[$0] }
         var artistTiles = tiles(artists)
-        let ordered = snapshot.artists.sorted {
-            $0.value.plays != $1.value.plays ? $0.value.plays > $1.value.plays : $0.key < $1.key
-        }
-        if let index = ordered.firstIndex(where: { keys.contains($0.key) }) {
-            artistTiles.append(StatTile(value: "#\(index + 1)", caption: "artist in imported history", symbol: "list.number"))
+        if let rank = keys.compactMap({ snapshot.artistRanks[$0] }).min() {
+            artistTiles.append(StatTile(value: "#\(rank)", caption: "artist in imported history", symbol: "list.number"))
         }
         out.artist.add(artistTiles, from: source)
         var albumTiles = tiles(Array(album))

@@ -40,6 +40,27 @@ await MainActor.run {
     expect(LinerNotesService.yearPrefix("1980-09-02") == "1980", "artist life-span year formatting stays unchanged")
 
     let day: Double = 86_400
+    let screens = [CGRect(x: 0, y: 0, width: 1440, height: 900),
+                   CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+                   CGRect(x: 0, y: 900, width: 1600, height: 1200)]
+    expect(WindowGeometry.screenIndex(for: CGRect(x: -800, y: 100, width: 488, height: 220), screens: screens) == 1,
+           "negative-coordinate monitor selected by overlap")
+    expect(WindowGeometry.screenIndex(for: CGRect(x: 100, y: 1200, width: 488, height: 220), screens: screens) == 2,
+           "vertically stacked monitor selected")
+    expect(WindowGeometry.screenIndex(for: CGRect(x: 1700, y: 100, width: 488, height: 220), screens: screens) == 0,
+           "offscreen saved position selects nearest remaining monitor")
+    let area = CGRect(x: -1930, y: 30, width: 1940, height: 1020)
+    let right = CGRect(x: area.maxX - 488, y: area.maxY - 220, width: 488, height: 220)
+    let small = WindowGeometry.resized(right, to: CGSize(width: 340, height: 120), in: area, growDown: false)
+    expect(small.maxX == right.maxX && small.maxY == right.maxY, "compact resize preserves top-right alignment")
+    let restored = WindowGeometry.resized(small, to: right.size, in: area, growDown: false)
+    expect(restored == right, "normal resize restores the same aligned frame")
+    let off = CGRect(x: -2200, y: -200, width: 488, height: 220)
+    expect(WindowGeometry.origin(for: off, in: area, snap: 20, clamp: true, scale: 2) == area.origin,
+           "card clamps to the current monitor's visible area")
+    let huge = CGRect(x: -1000, y: 0, width: 488, height: 1300)
+    expect(WindowGeometry.origin(for: huge, in: area, snap: 20, clamp: true, scale: 2).y + huge.height == area.maxY,
+           "oversize panel keeps its header visible")
     let now = Date().timeIntervalSince1970
 
     // MARK: Music library reader

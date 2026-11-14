@@ -45,6 +45,11 @@ final class SpotifyArchive {
         var songs: [String: Total] = [:]
         var artists: [String: Total] = [:]
         var albums: [String: Total] = [:]
+        var songsByArtist: [String: [Total]] = [:]
+        var artistRanks: [String: Int] = [:]
+        var topSongs: [Total] = []
+        var topArtists: [Total] = []
+        var topAlbums: [Total] = []
         var first: Date? { events.first?.ended }
         var last: Date? { events.last?.ended }
         var isEmpty: Bool { events.isEmpty }
@@ -267,6 +272,24 @@ final class SpotifyArchive {
             snapshot.artists[TitleTidy.key(event.artist), default: seed].add(event)
             if !event.album.isEmpty { snapshot.albums[event.albumKey, default: seed].add(event) }
         }
+        // Build lookup/ranking indexes once on the import/load worker, never on hover.
+        for song in snapshot.songs.values {
+            snapshot.songsByArtist[TitleTidy.key(song.artist), default: []].append(song)
+        }
+        let rankedArtists = snapshot.artists.sorted {
+            $0.value.plays != $1.value.plays ? $0.value.plays > $1.value.plays : $0.key < $1.key
+        }
+        for (offset, item) in rankedArtists.enumerated() { snapshot.artistRanks[item.key] = offset + 1 }
+        func ranked(_ totals: [Total]) -> [Total] {
+            Array(totals.sorted {
+                if $0.plays != $1.plays { return $0.plays > $1.plays }
+                if $0.milliseconds != $1.milliseconds { return $0.milliseconds > $1.milliseconds }
+                return $0.title < $1.title
+            }.prefix(100))
+        }
+        snapshot.topSongs = ranked(Array(snapshot.songs.values))
+        snapshot.topArtists = ranked(Array(snapshot.artists.values))
+        snapshot.topAlbums = ranked(Array(snapshot.albums.values))
         return snapshot
     }
 

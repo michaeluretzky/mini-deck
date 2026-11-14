@@ -136,16 +136,12 @@ enum HistoryBook {
         } else {
             let totals: [SpotifyArchive.Total]
             switch list {
-            case .songs: totals = Array(snapshot.songs.values)
-            case .artists: totals = Array(snapshot.artists.values)
-            case .albums: totals = Array(snapshot.albums.values)
+            case .songs: totals = snapshot.topSongs
+            case .artists: totals = snapshot.topArtists
+            case .albums: totals = snapshot.topAlbums
             case .recent: totals = []
             }
-            page.rows = totals.sorted {
-                if $0.plays != $1.plays { return $0.plays > $1.plays }
-                if $0.milliseconds != $1.milliseconds { return $0.milliseconds > $1.milliseconds }
-                return $0.title < $1.title
-            }.prefix(100).enumerated().map {
+            page.rows = totals.enumerated().map {
                 let item = $0.element
                 return HistoryRow(rank: $0.offset + 1,
                     title: list == .artists ? item.artist : (list == .albums ? item.album : item.title),
