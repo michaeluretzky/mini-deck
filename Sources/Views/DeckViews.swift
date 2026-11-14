@@ -132,7 +132,8 @@ struct NowPlayingColumn: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "music.note")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(deck.swatch.lead)
@@ -147,6 +148,8 @@ struct NowPlayingColumn: View {
                         SoundBars(spectrum: spectrum, playing: deck.isPlaying, tint: deck.swatch.lead)
                             .accessibilityHidden(true)
                     }
+                    }
+                    ServiceBadge(deck: deck)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "person.fill").frame(width: 16).accessibilityHidden(true)
@@ -174,30 +177,41 @@ struct NowPlayingColumn: View {
 
             Scrubber(deck: deck, pointer: pointer)
                 .padding(.top, 4)
-            if deck.source == .spotify {
-                Button {
-                    let parts = deck.track.trackID.split(separator: ":")
-                    if parts.count == 3, parts[0] == "spotify", parts[1] == "track",
-                       parts[2].count == 22, parts[2].allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }),
-                       let url = URL(string: "https://open.spotify.com/track/\(parts[2])") {
-                        NSWorkspace.shared.open(url)
-                    } else {
-                        deck.revealApp()
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if let logo = NSImage(named: "SpotifyLogo") {
-                            Image(nsImage: logo).resizable().scaledToFit().frame(width: 70, height: 22)
-                        } else {
-                            Text("Spotify")
-                        }
-                        Text("Open Spotify").font(.system(size: 9))
-                        Image(systemName: "arrow.up.right").font(.system(size: 8))
-                    }
-                }.buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel("Open this track in Spotify")
-            }
         }
+    }
+}
+
+/// Compact, clickable service identity; no footer row or visible action caption.
+struct ServiceBadge: View {
+    let deck: Deck
+    private static let musicIcon = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Source.music.bundle)
+        .map { NSWorkspace.shared.icon(forFile: $0.path) }
+
+    var body: some View {
+        Button {
+            let parts = deck.track.trackID.split(separator: ":")
+            if deck.source == .spotify, parts.count == 3, parts[0] == "spotify", parts[1] == "track",
+               parts[2].count == 22, parts[2].allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }),
+               let url = URL(string: "https://open.spotify.com/track/\(parts[2])") {
+                NSWorkspace.shared.open(url)
+            } else {
+                deck.revealApp()
+            }
+        } label: {
+            Group {
+                if let image = deck.source == .spotify ? NSImage(named: "SpotifyIcon") : Self.musicIcon {
+                    Image(nsImage: image).resizable().scaledToFit()
+                } else {
+                    Image(systemName: "music.note").resizable().scaledToFit()
+                }
+            }
+            .frame(width: 22, height: 22)
+            .padding(.horizontal, 3)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(deck.source.name)
+        .accessibilityLabel("Show \(deck.source.name)")
     }
 }
 
@@ -619,7 +633,8 @@ struct MusicSection: View {
             }
             if n?.hasFacts == true || spotifyAlbum != nil {
                 Flow {
-                    if let date = spotifyAlbum?.release_date ?? n?.year {
+                    if let date = ReleaseDateText.display(spotifyAlbum?.release_date)
+                        ?? ReleaseDateText.display(n?.releaseDate) {
                         FactChip(symbol: "calendar", text: "Released \(date)", tint: deck.swatch.lead)
                     }
                     if let count = spotifyAlbum?.total_tracks ?? n?.songCount {

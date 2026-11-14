@@ -18,14 +18,14 @@ struct ArtistProfile: Equatable, Sendable {
 }
 
 struct AlbumNotes: Equatable, Sendable {
-    var year: String?
+    var releaseDate: String?
     var songCount: Int?
     var runtime: Int?
     var genre: String?
     var artworkURL: URL?
     var summary: String?
     var artist: ArtistProfile?
-    var hasFacts: Bool { year != nil || songCount != nil || runtime != nil || genre != nil }
+    var hasFacts: Bool { ReleaseDateText.display(releaseDate) != nil || songCount != nil || runtime != nil || genre != nil }
     var isEmpty: Bool { !hasFacts && summary == nil && artist == nil && artworkURL == nil }
 }
 
@@ -49,7 +49,9 @@ actor LinerNotesService {
         async let blurb = Self.albumSummary(title: title, artist: artist)
         var notes = await store ?? AlbumNotes()
         if let b = await brainz {
-            if let y = b.year { notes.year = y }      // first release beats reissue dates
+            if let date = b.releaseDate, ReleaseDateText.display(date) != nil {
+                notes.releaseDate = date // First release beats reissue dates; retain source precision.
+            }
             notes.artist = b.artist
         }
         notes.summary = await blurb
@@ -90,7 +92,7 @@ actor LinerNotesService {
               let hit = TitleTidy.bestMatch(found.results, title: album, name: { $0.collectionName }),
               let id = hit.collectionId else { return nil }
         var notes = AlbumNotes()
-        notes.year = hit.releaseDate.flatMap(yearPrefix)
+        notes.releaseDate = hit.releaseDate
         notes.songCount = hit.trackCount
         notes.genre = hit.primaryGenreName
         notes.artworkURL = hit.artworkUrl100.flatMap { URL(string: $0.replacingOccurrences(of: "100x100bb", with: "600x600bb")) }
@@ -116,15 +118,15 @@ actor LinerNotesService {
         return await Self.fetch(type, url, tries: 3)
     }
 
-    private func brainzAlbum(artist: String, album: String) async -> (year: String?, artist: ArtistProfile?)? {
+    private func brainzAlbum(artist: String, album: String) async -> (releaseDate: String?, artist: ArtistProfile?)? {
         let a = Self.lucene(artist), t = Self.lucene(TitleTidy.base(album))
-        var year: String?
+        var releaseDate: String?
         var artistID: String?
         let groupURL = Self.link("https://musicbrainz.org/ws/2/release-group/",
                                  ["query": "releasegroup:\"\(t)\" AND artist:\"\(a)\"", "fmt": "json", "limit": "5"])
         if let groups = await brainz(MBGroupSearch.self, groupURL),
            let group = TitleTidy.bestMatch(groups.groups, title: album, name: { $0.title }) {
-            year = group.firstReleaseDate.flatMap(Self.yearPrefix)
+            releaseDate = group.firstReleaseDate
             artistID = group.artistCredit?.first?.artist.id
         }
         if artistID == nil {
@@ -138,8 +140,8 @@ actor LinerNotesService {
         }
         var profile: ArtistProfile?
         if let artistID { profile = await artistProfile(id: artistID, fallbackName: artist) }
-        if year == nil && profile == nil { return nil }
-        return (year, profile)
+        if releaseDate == nil && profile == nil { return nil }
+        return (releaseDate, profile)
     }
 
     private func artistProfile(id: String, fallbackName: String) async -> ArtistProfile? {

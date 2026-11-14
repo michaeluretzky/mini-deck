@@ -48,6 +48,7 @@ if [[ -n "${MINIDECK_SPOTIFY_CLIENT_ID:-}" ]]; then
 fi
 cp "$root/LICENSE" "$app/Contents/Resources/LICENSE.txt"
 cp "$root/Assets/SpotifyLogo.png" "$app/Contents/Resources/SpotifyLogo.png"
+cp "$root/Assets/SpotifyIcon.png" "$app/Contents/Resources/SpotifyIcon.png"
 cp "$root/Assets/NOTICE.txt" "$app/Contents/Resources/NOTICE.txt"
 print -n "APPL????" > "$app/Contents/PkgInfo"
 

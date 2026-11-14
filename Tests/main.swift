@@ -19,6 +19,26 @@ func expect(_ ok: Bool, _ what: String, line: Int = #line) {
 }
 
 await MainActor.run {
+    // MARK: Catalog release dates
+
+    expect(ReleaseDateText.display("2020-09-02") == "September 2, 2020", "full release date uses month day, year")
+    expect(ReleaseDateText.display("2020-09-02T00:00:00Z") == "September 2, 2020", "Apple timestamp retains calendar day")
+    expect(ReleaseDateText.display("2020-09-02T00:00:00+14:00") == "September 2, 2020", "release date does not shift with timezone")
+    expect(ReleaseDateText.display("2020-09") == "September 2020", "month precision does not invent a day")
+    expect(ReleaseDateText.display("2020") == "2020", "year precision does not invent a month")
+    expect(ReleaseDateText.display("2000-02-29") == "February 29, 2000", "Gregorian leap century accepted")
+    expect(ReleaseDateText.display("2024-02-29") == "February 29, 2024", "leap day accepted")
+    expect(ReleaseDateText.display("1900-02-29") == nil, "non-leap century rejected")
+    for invalid in ["2023-02-29", "2020-04-31", "2020-00-01", "2020-13-01", "2020-01-00",
+                    "2020-1-02", "2020--02", "0000", "", "unknown", "2020-09-02-extra"] {
+        expect(ReleaseDateText.display(invalid) == nil, "invalid release date rejected: \(invalid)")
+    }
+    expect(ReleaseDateText.display(nil) == nil, "absent release date remains absent")
+    expect(ReleaseDateText.display(" 2020-09-02\n") == "September 2, 2020", "catalog whitespace trimmed")
+    expect(AlbumNotes(releaseDate: "2020-09-02").hasFacts, "full album release date is a fact")
+    expect(!AlbumNotes(releaseDate: "unknown").hasFacts, "invalid album release date is not a fact")
+    expect(LinerNotesService.yearPrefix("1980-09-02") == "1980", "artist life-span year formatting stays unchanged")
+
     let day: Double = 86_400
     let now = Date().timeIntervalSince1970
 

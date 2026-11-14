@@ -1,6 +1,8 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.4.3 integrates historical song data directly into song, artist and album details and the overall Spotify history. The separate source banner and source tab have been removed. Existing private data is preserved. This release also simplifies animation math for compiler compatibility and keeps the collapse control available when statistics are empty.
+Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotify dates and Apple/MusicBrainz album-note fallbacks share the same format. Dates with only month or year precision remain **September 2020** or **2020**, without invented dates or timezone shifts. Artist birth and formation years are unchanged. Existing private listening data is preserved.
+
+The Spotify or Apple Music service icon now sits at the top-right of the player in a compact 22-point badge. It remains clickable, without a visible “Open…” caption. Removing the old attribution footer reduces the card's bottom space while preserving the track/control spacing.
 
 Drawer responsiveness: reduces the intentional cover-hover delay from 280 to 90 milliseconds, removes competing content/window resize animations, coalesces size updates, and avoids full-card hover invalidations for every mouse movement. A short exit grace period prevents transient resize events from immediately collapsing the drawer. These are implementation changes, not a measured end-to-end latency guarantee.
 

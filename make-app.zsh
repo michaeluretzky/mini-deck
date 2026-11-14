@@ -37,6 +37,7 @@ fi
 
 cp "$root/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Assets/SpotifyLogo.png" "$app/Contents/Resources/SpotifyLogo.png"
+cp "$root/Assets/SpotifyIcon.png" "$app/Contents/Resources/SpotifyIcon.png"
 cp "$root/Assets/NOTICE.txt" "$app/Contents/Resources/NOTICE.txt"
 if [[ -n "${MINIDECK_SPOTIFY_CLIENT_ID:-}" ]]; then
   if ! [[ "$MINIDECK_SPOTIFY_CLIENT_ID" =~ '^[a-fA-F0-9]{32}$' ]]; then
