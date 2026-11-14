@@ -72,19 +72,21 @@ struct NotchRoot: View {
                     NotchPlayer(state: state, deck: deck, pointer: pointer, spectrum: spectrum, soundBars: soundBars,
                                 actions: actions)
                         .frame(width: state.open.width, height: state.open.height, alignment: .top)
-                        .transition(.identity)
+                        .transition(.asymmetric(insertion: .scale(scale: 0.55, anchor: .top).combined(with: .opacity),
+                                                removal: .opacity))
                 } else if wings {
                     NotchWings(deck: deck, spectrum: spectrum, soundBars: soundBars, height: state.notch.height,
                                gap: state.notch.width)
-                        .transition(.identity)
+                        .transition(.opacity)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(.named(Space.deck))
         .environment(\.colorScheme, .dark)
-        // Opens and closes in the same frame as the pointer move: no animation, no delay.
-        .transaction { $0.animation = nil }
+        // Starts in the same frame as the pointer move, then grows from the notch to full size.
+        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: open)
+        .animation(.easeOut(duration: 0.18), value: wings)
     }
 }
 
