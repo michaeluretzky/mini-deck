@@ -56,6 +56,30 @@ struct WindowChecks {
                 expect(window.frame == normal, "\(corner): round trip does not drift")
             }
         }
+        // Reported issue: a double-click starts a tiny drag, then the size switch
+        // rebuilds the card before the drag ends. The card must stay on screen.
+        stage.fit(height: 163, width: 340, growDown: false)
+        stage.park(at: .topTrailing)
+        let compactRight = window.frame
+        stage.dragMoved()
+        stage.fit(height: 218, width: 488, growDown: false)
+        expect(area.contains(window.frame), "interrupted drag: normal view stays on screen")
+        expect(window.frame.maxX == compactRight.maxX, "interrupted drag: right edge preserved")
+        stage.dragMoved()
+        stage.cancelDrag()
+        stage.fit(height: 163, width: 340, growDown: false)
+        expect(window.frame == compactRight, "cancelled drag: compact returns to the same place")
+        for corner in Corner.allCases {
+            stage.park(at: corner)
+            for size in [(218.0, 488.0), (163.0, 340.0), (218.0, 488.0)] {
+                stage.dragMoved()
+                stage.fit(height: size.0, width: size.1, growDown: false)
+                expect(area.contains(window.frame), "\(corner): size switch during drag stays on screen")
+            }
+        }
+        stage.fit(height: 218, width: 488, growDown: false)
+        stage.park(at: .topTrailing)
+
         let saved = window.frame
         stage.hide()
         let (reopened, reopenedWindow) = build()

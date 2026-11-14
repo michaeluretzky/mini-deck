@@ -238,6 +238,23 @@ final class Stage {
 
     func dragEnded() {
         guard grab != nil else { return }
+        finishDrag()
+    }
+
+    /// Ends a drag that the card can no longer finish, such as when a size switch rebuilds it.
+    func cancelDrag() {
+        guard grab != nil else { return }
+        finishDrag()
+    }
+
+    /// SwiftUI may cancel a drag without calling onEnded when the view is rebuilt.
+    /// No pressed button means no drag is really in progress.
+    private func dropStaleGrab() {
+        guard grab != nil, NSEvent.pressedMouseButtons & 1 == 0 else { return }
+        finishDrag()
+    }
+
+    private func finishDrag() {
         if let panel, let target = screen(for: panel.frame) { homeScreenID = screenID(target) }
         grab = nil
         restingFrame = panel?.frame
@@ -249,6 +266,7 @@ final class Stage {
 
     /// Pulls the card fully back on screen after a drag, a display change, or a resize.
     func settle() {
+        dropStaleGrab()
         guard let panel, grab == nil, !adjustingFrame else { return }
         var base = restingFrame ?? panel.frame
         guard let area = playArea(for: base) else { return }
@@ -306,9 +324,15 @@ final class Stage {
         let height = ceil(height * scale) / scale
         let f = panel.frame
         drawerExpanded = growDown
+        dropStaleGrab()
         guard abs(f.height - height) > 0.5 || f.width != width else { return }
         if grab != nil {
-            apply(NSRect(x: f.minX, y: f.maxY - height, width: width, height: height))
+            // Even mid-drag, a size change must not push the card past a screen edge.
+            var moving = NSRect(x: f.minX, y: f.maxY - height, width: width, height: height)
+            if let area = playArea(for: moving) {
+                moving.origin = WindowGeometry.origin(for: moving, in: area, snap: 0, clamp: true, scale: scale)
+            }
+            apply(moving)
             return
         }
         let base = restingFrame ?? f

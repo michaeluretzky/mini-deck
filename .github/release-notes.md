@@ -1,5 +1,7 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
+Version 1.4.7 fixes the player going off the side of the screen after a double-click size switch. A double-click could also start a tiny drag; the size switch then rebuilt the card before that drag ended, so edge correction stopped. Size switches now finish any unfinished drag, and every resize stays inside the screen even mid-drag.
+
 Version 1.4.6 fixes screen-edge alignment. The complete glow stays inside the usable display with a 10-point outer margin at parked edges. Normal and compact sizes preserve the selected side or center anchor even away from an exact snap point. Drawer expansion no longer replaces the saved resting position, and display/Dock changes preserve edge distances. Saved placement now includes the resting size, display and anchor.
 
 Version 1.4.5 removes the extra “total songs/artists/albums” words beside play counts. Summary and advanced cards show only a smaller `/ N`, while retaining the large play count, card heading, and “overall plays” caption.

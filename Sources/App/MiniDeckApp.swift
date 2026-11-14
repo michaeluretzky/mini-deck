@@ -128,6 +128,8 @@ final class Hub {
 
     func setCompact(_ compact: Bool) {
         guard prefs.compactView != compact else { return }
+        // A double-click can begin a tiny drag; finish it before the card is rebuilt.
+        stage.cancelDrag()
         pointer.resetLayout()
         cardSizing.reset(compact: compact)
         prefs.compactView = compact
