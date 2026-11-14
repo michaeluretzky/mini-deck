@@ -67,25 +67,24 @@ struct NotchRoot: View {
             NotchOutline(bottom: open ? 24 : min(10, state.notch.height / 3))
                 .fill(Color.black)
                 .frame(width: width, height: height)
-                .shadow(color: .black.opacity(open ? 0.45 : 0), radius: 10, y: 4)
             Group {
                 if open {
                     NotchPlayer(state: state, deck: deck, pointer: pointer, spectrum: spectrum, soundBars: soundBars,
                                 actions: actions)
                         .frame(width: state.open.width, height: state.open.height, alignment: .top)
-                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                        .transition(.identity)
                 } else if wings {
                     NotchWings(deck: deck, spectrum: spectrum, soundBars: soundBars, height: state.notch.height,
                                gap: state.notch.width)
-                        .transition(.opacity)
+                        .transition(.identity)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(.named(Space.deck))
         .environment(\.colorScheme, .dark)
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: open)
-        .animation(.easeInOut(duration: 0.25), value: wings)
+        // Opens and closes in the same frame as the pointer move: no animation, no delay.
+        .transaction { $0.animation = nil }
     }
 }
 
@@ -162,7 +161,6 @@ struct NotchPlayer: View {
                         NotchCover(deck: deck, side: Self.cover, corner: 12)
                     }
                     .buttonStyle(Squish())
-                    .shadow(color: deck.swatch.ground.opacity(0.8), radius: 8, y: 3)
                     .help("Show \(deck.source.appName)")
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {

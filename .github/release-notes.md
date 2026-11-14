@@ -1,6 +1,6 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.6.1 makes the open notch player larger and easier to read. The album cover is twice as big and sits on the left, with the song, artist, full-size playback buttons and the playback bar beside it. Song and artist text is larger, and the closed cover beside the notch is slightly bigger.
+Version 1.6.1 makes the open notch player larger and easier to read. The album cover is twice as big and sits on the left, with the song, artist, full-size playback buttons and the playback bar beside it. Song and artist text is larger, and the closed cover beside the notch is slightly bigger. The notch is now pure black with no glow or shadow, so it blends into the camera notch. It opens the moment the pointer reaches it, with no animation delay, and closes 0.12 seconds after the pointer leaves.
 
 Version 1.6.0 adds **Show in Notch**, in the menu bar menu and the player's right-click menu. The player moves into the camera notch at the top of the screen, like the Dynamic Island. Closed, it shows the album cover on the left of the notch and the sound bars on the right. Point at the notch to open the player with the song, artist, playback buttons and the playback bar at the bottom. Move the pointer away and it closes. While closed, clicks pass through to the menu bar. On a screen without a notch, the player sits at the top center. It includes all of 1.5.0 below.
 

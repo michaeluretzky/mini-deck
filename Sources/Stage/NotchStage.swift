@@ -124,7 +124,7 @@ final class NotchStage {
                 closer = nil
             } else if closer == nil {
                 closer = Task { [weak self] in
-                    try? await Task.sleep(for: .milliseconds(250))
+                    try? await Task.sleep(for: .milliseconds(120))
                     guard let self, !Task.isCancelled else { return }
                     self.closer = nil
                     if !NotchGeometry.keepZone(self.openRect).contains(NSEvent.mouseLocation) { self.setExpanded(false) }
