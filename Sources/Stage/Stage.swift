@@ -96,7 +96,8 @@ final class Stage {
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
 
-    func build<V: View>(_ root: V, scroll: @escaping (NSEvent) -> Bool, pointer: @escaping (CGPoint?) -> Void) {
+    func build<V: View>(_ root: V, scroll: @escaping (NSEvent) -> Bool, pointer: @escaping (CGPoint?) -> Void,
+                        showNow: Bool = true) {
         let start = NSRect(x: 0, y: 0, width: Metrics.panelWidth, height: 164)
         let host = DeckHostView(rootView: root)
         host.sizingOptions = []
@@ -138,7 +139,7 @@ final class Stage {
         center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.settle() }
         }
-        show()
+        if showNow { show() }
     }
 
     // MARK: Showing

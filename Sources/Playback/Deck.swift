@@ -61,6 +61,17 @@ final class Deck {
         didSet { if pixelScale != oldValue { rerenderCover() } }
     }
 
+#if MINIDECK_WINDOW_TESTS
+    /// Sample state for layout previews only.
+    func preview(_ snap: Snapshot, cover: NSImage?) {
+        track = snap
+        appOpen = true
+        self.cover = cover
+        anchorPosition = snap.position
+        anchorDate = Date()
+    }
+#endif
+
     var isPlaying: Bool { track.state == .playing }
     var hasTrack: Bool { appOpen && track.state != .stopped && !track.title.isEmpty }
 

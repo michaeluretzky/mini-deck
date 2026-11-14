@@ -494,6 +494,41 @@ func checkOngoingPersistence() async {
     } catch { expect(false, "forward persistence: \(error.localizedDescription)") }
 }
 
+/// The notch player sits on the camera notch, stays on screen, and opens only near the notch.
+func checkNotch() {
+    // 1470 x 956 points, like a 13-inch MacBook Air, with a 185-point notch 32 points tall.
+    let screen = CGRect(x: 0, y: 0, width: 1470, height: 956)
+    let notch = NotchGeometry.notch(screen: screen, menuBarHeight: 32, safeTop: 32, leftWidth: 642.5, rightWidth: 642.5)
+    expect(notch == CGRect(x: 642.5, y: 924, width: 185, height: 32), "notch rect matches the camera notch")
+    expect(abs(notch.midX - screen.midX) < 0.01, "notch is centered")
+    let closed = NotchGeometry.collapsed(notch, wings: true)
+    expect(closed.width == 185 + 2 * NotchGeometry.wing && closed.midX == notch.midX, "wings add equal width on both sides")
+    expect(NotchGeometry.collapsed(notch, wings: false) == notch, "no song means no wings")
+    let open = NotchGeometry.expanded(notch, screen: screen)
+    expect(open.width == NotchGeometry.expandedWidth && abs(open.midX - notch.midX) < 0.01, "open player is centered under the notch")
+    expect(open.maxY == screen.maxY && open.height == 32 + NotchGeometry.expandedBody, "open player hangs from the top edge")
+    let window = NotchGeometry.window(notch, screen: screen)
+    expect(window.contains(open) && screen.contains(window), "window holds the open player and stays on screen")
+    let hover = NotchGeometry.hoverZone(closed)
+    expect(hover.contains(CGPoint(x: notch.midX, y: screen.maxY - 1)), "pointing at the notch opens the player")
+    expect(hover.contains(CGPoint(x: closed.minX + 2, y: notch.midY)), "pointing at a wing opens the player")
+    expect(!hover.contains(CGPoint(x: notch.midX, y: notch.minY - 30)), "pointer below the notch does not open it")
+    expect(NotchGeometry.keepZone(open).contains(CGPoint(x: open.midX, y: open.minY + 2)), "open player stays open while pointed at")
+
+    // A screen without a notch gets a virtual one centered at the top.
+    let flat = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
+    let virtual = NotchGeometry.notch(screen: flat, menuBarHeight: 25, safeTop: 0, leftWidth: nil, rightWidth: nil)
+    expect(virtual.width == NotchGeometry.virtualWidth && virtual.height == 25 && abs(virtual.midX - flat.midX) < 0.01,
+           "screens without a notch get a centered virtual notch")
+    expect(virtual.maxY == flat.maxY, "virtual notch touches the top edge")
+    let odd = NotchGeometry.notch(screen: flat, menuBarHeight: 0, safeTop: 30, leftWidth: 10, rightWidth: 10)
+    expect(odd.width == NotchGeometry.virtualWidth && odd.height == NotchGeometry.minimumHeight,
+           "unreasonable notch areas fall back to a virtual notch")
+    let tiny = CGRect(x: 0, y: 0, width: 300, height: 400)
+    let tinyNotch = NotchGeometry.notch(screen: tiny, menuBarHeight: 24, safeTop: 0, leftWidth: nil, rightWidth: nil)
+    expect(tiny.contains(NotchGeometry.window(tinyNotch, screen: tiny)), "narrow screens keep the notch player on screen")
+}
+
 /// The card redraws only for visible changes, and hover lookups stay indexed.
 @MainActor
 func checkEnergy() {
@@ -783,5 +818,6 @@ await checkWrapped()
 await checkPointer()
 checkResponsiveness()
 checkEnergy()
+checkNotch()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
