@@ -42,6 +42,15 @@ jobs:
             -o "$RUNNER_TEMP/HistoryTests"
           "$RUNNER_TEMP/HistoryTests"
 
+      - name: Run native window placement tests
+        run: |
+          set -euo pipefail
+          cache="$RUNNER_TEMP/cache"
+          xcrun swiftc -parse-as-library -D MINIDECK_WINDOW_TESTS -swift-version 5 -warnings-as-errors \
+            -module-name MiniDeckWindowTests -target arm64-apple-macos14.0 -module-cache-path "$cache" \
+            Sources/*/*.swift Tests/WindowChecks.swift -o "$RUNNER_TEMP/MiniDeckWindowTests"
+          "$RUNNER_TEMP/MiniDeckWindowTests"
+
       - name: Build the release zip
         run: zsh make-release.zsh
 

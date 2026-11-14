@@ -5,6 +5,7 @@ import ServiceManagement
 import SwiftUI
 import UniformTypeIdentifiers
 
+#if !MINIDECK_WINDOW_TESTS
 @main
 struct MiniDeckApp: App {
     @NSApplicationDelegateAdaptor(Launcher.self) private var launcher
@@ -18,6 +19,7 @@ struct MiniDeckApp: App {
         .menuBarExtraStyle(.menu)
     }
 }
+#endif
 
 @MainActor
 final class Launcher: NSObject, NSApplicationDelegate {
