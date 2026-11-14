@@ -153,27 +153,27 @@ enum StatsBook {
         }
         let album = songs.filter { !track.album.isEmpty && SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album) }
         let source = "Spotify history · all devices + this Mac · \(coverage)"
-        func tiles(_ rows: [SpotifyArchive.Total], total: Int, kind: String) -> [StatTile] {
+        func tiles(_ rows: [SpotifyArchive.Total], total: Int) -> [StatTile] {
             guard !rows.isEmpty else { return [] }
             let plays = rows.reduce(0) { $0 + $1.plays }
             let seconds = rows.reduce(0.0) { $0 + $1.seconds }
             let time = seconds < 60 ? "\(Int(seconds)) sec" : duration(seconds)
             return [StatTile(value: "\(plays)", caption: "overall plays", symbol: "play.circle",
-                             supplement: "/ \(total.formatted()) total \(kind)"),
+                             supplement: "/ \(total.formatted())"),
                     StatTile(value: time, caption: "known listening time", symbol: "clock")]
         }
-        var songTiles = tiles(Array(matching), total: snapshot.songTotals.count, kind: "songs")
+        var songTiles = tiles(Array(matching), total: snapshot.songTotals.count)
         if let last = matching.map(\.last).max() {
             songTiles.append(StatTile(value: ago(last), caption: "last recorded play", symbol: "calendar"))
         }
         out.song.add(songTiles, from: source)
         let artists = keys.compactMap { snapshot.artists[$0] }
-        var artistTiles = tiles(artists, total: snapshot.artists.count, kind: "artists")
+        var artistTiles = tiles(artists, total: snapshot.artists.count)
         if let rank = keys.compactMap({ snapshot.artistRanks[$0] }).min() {
             artistTiles.append(StatTile(value: "#\(rank)", caption: "artist in saved history", symbol: "list.number"))
         }
         out.artist.add(artistTiles, from: source)
-        var albumTiles = tiles(Array(album), total: snapshot.albums.count, kind: "albums")
+        var albumTiles = tiles(Array(album), total: snapshot.albums.count)
         if !album.isEmpty {
             albumTiles.append(StatTile(value: "\(album.count)", caption: "songs in saved history", symbol: "music.note.list"))
         }

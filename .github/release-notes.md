@@ -1,5 +1,7 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
+Version 1.4.5 removes the extra “total songs/artists/albums” words beside play counts. Summary and advanced cards show only a smaller `/ N`, while retaining the large play count, card heading, and “overall plays” caption.
+
 Ongoing Spotify history now begins on first launch. Mini Deck privately saves observed Spotify playback and available recent account records, polls at startup and about every two minutes, attempts bounded catch-up, and reconciles local/API duplicates. The combined song, artist, album, and history totals include forward records after the imported export cutoff. A newer export takes precedence through its cutoff. Closed/offline gaps and missing export files can still leave incomplete coverage; this is not a claim of guaranteed full synchronization ([Spotify recent history API](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).
 
 All valid music records now count as **overall plays**, including short listens, with no minimum-duration threshold. Listening time uses only known measured duration; API-only records do not invent it. The private ongoing journal survives restarts and has a separate clear control. Existing imports are not modified by this change.
@@ -10,7 +12,7 @@ Repeated Spotify IDs with identical title, artist and album metadata now share o
 
 The outer glow now uses a rounded falloff that reaches transparent pixels before the window edge, removing the rectangular blur cutoff.
 
-Song, artist and album play tiles retain their large play count and add a smaller `/ N total songs`, `/ N total artists`, or `/ N total albums` suffix. These are unique saved-history collection sizes, not play-count denominators; both summary and advanced tiles use the same caption-size styling.
+Song, artist and album play tiles retain their large play count and add a smaller `/ N` suffix. The respective values are unique saved-history song, artist and album collection sizes, not play-count denominators; both summary and advanced tiles use the same caption-size styling.
 
 Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotify dates and Apple/MusicBrainz album-note fallbacks share the same format. Dates with only month or year precision remain **September 2020** or **2020**, without invented dates or timezone shifts. Artist birth and formation years are unchanged. Existing private listening data is preserved.
 
