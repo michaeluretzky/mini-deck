@@ -13,7 +13,7 @@ final class NotchState {
     /// True when the screen has a real camera notch.
     var hasNotch = true
     /// Open player size in points.
-    var open = CGSize(width: NotchGeometry.expandedWidth, height: 144)
+    var open = CGSize(width: NotchGeometry.expandedWidth, height: 160)
 }
 
 /// Shows the player in the camera notch at the top of the screen, like the Dynamic Island.

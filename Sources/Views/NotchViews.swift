@@ -98,7 +98,7 @@ struct NotchWings: View {
     let gap: CGFloat
 
     var body: some View {
-        let side = min(22, height - 8)
+        let side = min(24, height - 7)
         HStack(spacing: 0) {
             NotchCover(deck: deck, side: side, corner: 5)
                 .frame(width: NotchGeometry.wing, alignment: .center)
@@ -141,7 +141,7 @@ struct NotchCover: View {
     }
 }
 
-/// Open view: cover, song and artist, playback buttons, and the playback bar at the bottom.
+/// Open view: a large cover on the left; song, artist, playback buttons and the playback bar on the right.
 struct NotchPlayer: View {
     let state: NotchState
     let deck: Deck
@@ -150,48 +150,57 @@ struct NotchPlayer: View {
     let soundBars: Bool
     let actions: NotchActions
 
+    static let cover: CGFloat = 92
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 0) {
             // Keeps the camera area clear.
-            Color.clear.frame(height: state.notch.height - 2)
+            Color.clear.frame(height: state.notch.height)
             if deck.hasTrack {
-                HStack(alignment: .center, spacing: 10) {
+                HStack(alignment: .center, spacing: 16) {
                     Button { deck.revealApp() } label: {
-                        NotchCover(deck: deck, side: 46, corner: 8)
+                        NotchCover(deck: deck, side: Self.cover, corner: 12)
                     }
                     .buttonStyle(Squish())
+                    .shadow(color: deck.swatch.ground.opacity(0.8), radius: 8, y: 3)
                     .help("Show \(deck.source.appName)")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(deck.track.title)
-                            .font(.system(size: 13, weight: .bold))
-                            .lineLimit(1)
-                        Text(deck.track.artist)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(deck.track.title)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .lineLimit(1)
+                                    .help(deck.track.title)
+                                Text(deck.track.artist)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .help(deck.track.artist)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(deck.track.title + "\n" + deck.track.artist)
+                            .transition(.opacity)
+                            if soundBars {
+                                SoundBars(spectrum: spectrum, playing: deck.isPlaying && EnergyPolicy.animates(deck.energyContext),
+                                          tint: deck.swatch.lead)
+                            }
+                        }
+                        Transport(deck: deck, pointer: pointer, scale: 1)
+                            .frame(maxWidth: .infinity)
+                            .zone(Zone.transport, pointer)
+                        Scrubber(deck: deck, pointer: pointer, scale: 1)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .id(deck.track.title + "\n" + deck.track.artist)
-                    .transition(.opacity)
-                    if soundBars {
-                        SoundBars(spectrum: spectrum, playing: deck.isPlaying && EnergyPolicy.animates(deck.energyContext),
-                                  tint: deck.swatch.lead)
-                    }
-                    ServiceBadge(deck: deck, size: 16)
-                }
-                .padding(.horizontal, 18)
-                Transport(deck: deck, pointer: pointer, scale: 0.8)
                     .frame(maxWidth: .infinity)
-                    .zone(Zone.transport, pointer)
-                Scrubber(deck: deck, pointer: pointer, scale: 0.8)
-                    .padding(.horizontal, 22)
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 10)
             } else {
                 NotchIdle(deck: deck)
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, 22)
                 Spacer(minLength: 0)
             }
+            Spacer(minLength: 0)
         }
-        .padding(.bottom, 10)
         .contentShape(.rect)
         .contextMenu { NotchMenu(deck: deck, actions: actions) }
     }
@@ -205,7 +214,7 @@ struct NotchIdle: View {
         VStack(spacing: 6) {
             Text(deck.controlBlocked ? "Allow Mini Deck to control \(name)"
                  : deck.appOpen ? "Nothing is playing" : "No music app is open")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
             Group {
                 if deck.controlBlocked {
                     Button("Open Settings") { Players.openAutomationSettings() }
@@ -219,10 +228,10 @@ struct NotchIdle: View {
                     }
                 }
             }
-            .controlSize(.small)
+            .controlSize(.regular)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .padding(.top, 14)
     }
 }
 
