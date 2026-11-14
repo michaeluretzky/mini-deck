@@ -6,12 +6,12 @@ import CoreGraphics
 /// Sizes for the notch player. All rects use screen coordinates with y growing upward.
 enum NotchGeometry {
     /// Width added on each side of the notch for the cover and sound bars.
-    static let wing: CGFloat = 38
+    static let wing: CGFloat = 40
     /// Small outward curve where the shape meets the top edge of the screen.
     static let flare: CGFloat = 6
-    static let expandedWidth: CGFloat = 420
+    static let expandedWidth: CGFloat = 500
     /// Height of the open player below the notch.
-    static let expandedBody: CGFloat = 112
+    static let expandedBody: CGFloat = 128
     /// Size used on screens without a camera notch.
     static let virtualWidth: CGFloat = 180
     static let minimumHeight: CGFloat = 24

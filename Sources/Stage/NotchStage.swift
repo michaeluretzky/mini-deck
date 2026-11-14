@@ -13,7 +13,7 @@ final class NotchState {
     /// True when the screen has a real camera notch.
     var hasNotch = true
     /// Open player size in points.
-    var open = CGSize(width: NotchGeometry.expandedWidth, height: 144)
+    var open = CGSize(width: NotchGeometry.expandedWidth, height: 160)
 }
 
 /// Shows the player in the camera notch at the top of the screen, like the Dynamic Island.
@@ -124,7 +124,7 @@ final class NotchStage {
                 closer = nil
             } else if closer == nil {
                 closer = Task { [weak self] in
-                    try? await Task.sleep(for: .milliseconds(250))
+                    try? await Task.sleep(for: .milliseconds(120))
                     guard let self, !Task.isCancelled else { return }
                     self.closer = nil
                     if !NotchGeometry.keepZone(self.openRect).contains(NSEvent.mouseLocation) { self.setExpanded(false) }
