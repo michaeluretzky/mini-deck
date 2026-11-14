@@ -103,7 +103,12 @@ final class Stage {
         host.pointerHandler = pointer
 
         let p = DeckPanel(contentRect: start, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        p.contentView = host
+        // A plain container owns the window size. When the card changes width, the hosting
+        // view cannot grow the window from its left edge; only fit() resizes and places it.
+        let container = NSView(frame: start)
+        host.autoresizingMask = [.width, .height]
+        container.addSubview(host)
+        p.contentView = container
         p.isOpaque = false
         p.backgroundColor = .clear
         p.hasShadow = false
@@ -328,14 +333,15 @@ final class Stage {
         let f = panel.frame
         drawerExpanded = growDown
         dropStaleGrab()
-        guard abs(f.height - height) > 0.5 || f.width != width else { return }
+        // Compare against the intended frame, not only the size. If anything else has
+        // already resized the window, it must still be moved back to its anchored place.
         if grab != nil {
             // Even mid-drag, a size change must not push the card past a screen edge.
             var moving = NSRect(x: f.minX, y: f.maxY - height, width: width, height: height)
             if let area = playArea(for: moving) {
                 moving.origin = WindowGeometry.origin(for: moving, in: area, snap: 0, clamp: true, scale: scale)
             }
-            apply(moving)
+            if !WindowGeometry.same(moving, f) { apply(moving) }
             return
         }
         let base = restingFrame ?? f
@@ -346,8 +352,8 @@ final class Stage {
         next.origin = WindowGeometry.origin(for: next, in: area, snap: 0, clamp: true, scale: scale)
         // Content expansion must not start an AppKit animation for every
         // SwiftUI size measurement or re-anchor a temporary expanded frame.
-        apply(next)
-        if !growDown { remember(next) }
+        if !WindowGeometry.same(next, f) { apply(next) }
+        if !growDown, restingFrame.map({ !WindowGeometry.same(next, $0) }) ?? true { remember(next) }
     }
 }
 

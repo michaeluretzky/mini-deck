@@ -1,6 +1,8 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
-Version 1.4.9 makes the player more responsive while resizing and showing details. Playback position no longer rebuilds the whole card every second. Only the progress bar moves, and the stats, details and window size update only when something visible changes. Listening stats are reused until the song or its history changes. Apple Music artist and album lookups are indexed when the library is read, instead of being recalculated on every redraw. Song changes no longer animate the card height while the window resizes, so the card does not briefly clip or leave a gap. Hover details open after 50 ms instead of 90 ms.
+Version 1.4.10 fixes the player going past the screen edge when switching from compact to normal view. macOS was widening the window from its left edge before Mini Deck placed it, so a player near the right edge ran off screen. The window size is now controlled only by Mini Deck, and every size change moves the player back to its anchored edge.
+
+Version 1.4.9 made the player more responsive while resizing and showing details. Playback position no longer rebuilds the whole card every second. Only the progress bar moves, and the stats, details and window size update only when something visible changes. Listening stats are reused until the song or its history changes. Apple Music artist and album lookups are indexed when the library is read, instead of being recalculated on every redraw. Song changes no longer animate the card height while the window resizes, so the card does not briefly clip or leave a gap. Hover details open after 50 ms instead of 90 ms.
 
 The playback bar now starts at the same edge as the song, artist and album text. The album cover grows to fill the full height beside them, down to the playback bar, in both normal and compact views. Compact playback buttons are larger (80% of normal size, up from 67%).
 
