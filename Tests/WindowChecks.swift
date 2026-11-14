@@ -56,6 +56,26 @@ struct WindowChecks {
                 expect(window.frame == normal, "\(corner): round trip does not drift")
             }
         }
+        // Reported issue: switching from compact to normal, AppKit widened the window from
+        // its left edge before fit() ran, and fit() skipped the move because the size matched.
+        for corner in Corner.allCases {
+            stage.fit(height: 218, width: 488, growDown: false)
+            stage.park(at: corner)
+            let normal = window.frame
+            stage.fit(height: 163, width: 340, growDown: false)
+            let compact = window.frame
+            window.setFrame(NSRect(x: compact.minX, y: compact.maxY - 218, width: 488, height: 218), display: false)
+            stage.fit(height: 218, width: 488, growDown: false)
+            expect(window.frame == normal, "\(corner): pre-widened window returns to its anchored normal frame")
+            expect(area.contains(window.frame), "\(corner): pre-widened window stays on screen")
+            window.setFrame(NSRect(x: normal.minX, y: normal.maxY - 163, width: 340, height: 163), display: false)
+            stage.fit(height: 163, width: 340, growDown: false)
+            expect(window.frame == compact, "\(corner): pre-narrowed window returns to its anchored compact frame")
+        }
+        // The hosting view must not resize the window when the card's width changes.
+        expect(window.contentView.map { type(of: $0) == NSView.self && $0.subviews.count == 1 } ?? false,
+               "window size is owned by a plain container")
+
         // Reported issue: a double-click starts a tiny drag, then the size switch
         // rebuilds the card before the drag ends. The card must stay on screen.
         stage.fit(height: 163, width: 340, growDown: false)

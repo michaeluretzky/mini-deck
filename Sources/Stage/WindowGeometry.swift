@@ -12,6 +12,12 @@ enum WindowGeometry {
         var vertical: Vertical
     }
 
+    /// Frames within half a point match; avoids redundant window updates from rounding.
+    static func same(_ a: CGRect, _ b: CGRect) -> Bool {
+        abs(a.minX - b.minX) <= 0.5 && abs(a.minY - b.minY) <= 0.5
+            && abs(a.width - b.width) <= 0.5 && abs(a.height - b.height) <= 0.5
+    }
+
     static func playArea(visibleFrame: CGRect, gap: CGFloat) -> CGRect {
         visibleFrame.insetBy(dx: max(0, gap), dy: max(0, gap))
     }
