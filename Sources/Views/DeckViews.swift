@@ -1169,6 +1169,7 @@ struct CardMenu: View {
                 Button(corner.title) { stage.park(at: corner) }
             }
         }
+        Toggle("Show in Notch", isOn: Binding(get: { prefs.notchMode }, set: { hub.setNotchMode($0) }))
         Button("Hide Player") { stage.hide() }
     }
 }

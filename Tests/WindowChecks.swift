@@ -164,6 +164,43 @@ struct WindowChecks {
             }
             try png.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
         }
+        // Notch preview: closed and open, on a 13-inch MacBook Air sized notch, with sample data.
+        if let index = CommandLine.arguments.firstIndex(of: "--notch-preview"), index + 1 < CommandLine.arguments.count {
+            let deck = Deck()
+            let art = NSImage(size: NSSize(width: 168, height: 168), flipped: false) { rect in
+                NSGradient(colors: [NSColor(red: 0.95, green: 0.55, blue: 0.3, alpha: 1),
+                                    NSColor(red: 0.45, green: 0.25, blue: 0.7, alpha: 1)])?.draw(in: rect, angle: -60)
+                return true
+            }
+            deck.preview(Snapshot(source: .spotify, state: .paused, title: "Sample Song Title", artist: "Sample Artist",
+                                  album: "Sample Album", trackID: "spotify:track:sample", position: 74, length: 212), cover: art)
+            let notchSize = CGSize(width: 185, height: 32)
+            func frame(_ open: Bool) -> some View {
+                let state = NotchState()
+                state.notch = notchSize
+                state.expanded = open
+                state.open = CGSize(width: NotchGeometry.expandedWidth, height: notchSize.height + NotchGeometry.expandedBody)
+                return ZStack(alignment: .top) {
+                    // Menu bar strip and the camera notch, for context.
+                    Rectangle().fill(Color(white: 0.85).opacity(0.25)).frame(height: notchSize.height)
+                    NotchRoot(state: state, deck: deck, pointer: Pointer(), spectrum: Spectrum(), soundBars: true,
+                              actions: NotchActions())
+                }
+                .frame(width: 560, height: open ? 176 : 56, alignment: .top)
+                .background(LinearGradient(colors: [Color(red: 0.2, green: 0.3, blue: 0.5), Color(red: 0.5, green: 0.35, blue: 0.45)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            let view = VStack(spacing: 14) { frame(false); frame(true) }
+                .padding(14).background(Color(white: 0.1)).environment(\.colorScheme, .dark)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let png = bitmap.representation(using: .png, properties: [:]) else {
+                fatalError("Notch preview rendering failed")
+            }
+            try png.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+        }
         print("\(checks - failures)/\(checks) native window checks passed")
         if failures > 0 { exit(1) }
     }

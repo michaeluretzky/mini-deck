@@ -44,6 +44,9 @@ final class Hub {
     let pointer = Pointer()
     let spectrum = Spectrum()
     let stage = Stage()
+    let notch = NotchStage()
+    /// Hover state for the notch player, kept apart from the floating player.
+    let notchPointer = Pointer()
     let log = ListeningLog()
     let account = SpotifyAccount()
     let library = MusicLibrary()
@@ -55,6 +58,8 @@ final class Hub {
     private let setupWindow = SetupWindow()
     private var started = false
     private var accountRefreshTask: Task<Void, Never>?
+    private var floatingVisible = false
+    private var notchVisible = false
 
     func start() {
         guard !started else { return }
@@ -76,13 +81,27 @@ final class Hub {
         account.onNotice = { [weak self] text in self?.deck.flash("person.crop.circle.badge.checkmark", text) }
         stage.onScaleChange = { [weak self] scale in self?.deck.pixelScale = scale }
         deck.energy = energy
-        stage.onVisibility = { [weak self] shown in self?.energy.setVisible(shown) }
+        stage.onVisibility = { [weak self] shown in
+            self?.floatingVisible = shown
+            self?.updateVisibility()
+        }
+        notch.onVisibility = { [weak self] shown in
+            self?.notchVisible = shown
+            self?.updateVisibility()
+        }
+        notch.hasTrack = { [weak self] in self?.deck.hasTrack ?? false }
+        notch.onCollapse = { [weak self] in self?.notchPointer.resetLayout() }
         // Waking, uncovering or leaving Low Power Mode refreshes at once and picks the new pace.
         energy.onChange = { [weak self] in self?.deck.repace() }
         energy.start()
         stage.build(DeckRoot(hub: self),
                     scroll: { [weak self] event in self?.scrolled(event) ?? false },
-                    pointer: { [weak self] point in self?.pointer.location = point })
+                    pointer: { [weak self] point in self?.pointer.location = point },
+                    showNow: !prefs.notchMode)
+        notch.build(NotchHost(hub: self),
+                    scroll: { [weak self] event in self?.scrolled(event) ?? false },
+                    pointer: { [weak self] point in self?.notchPointer.location = point })
+        if prefs.notchMode { notch.show() }
         deck.pixelScale = stage.scale
         deck.start()
         followPlayback()
@@ -136,7 +155,34 @@ final class Hub {
         spectrum.want(wanted.0, playing: wanted.1, bundle: wanted.2)
     }
 
+    private func updateVisibility() {
+        energy.setVisible(floatingVisible || notchVisible)
+    }
+
     // MARK: Menu actions
+
+    /// Moves the player between its floating window and the camera notch.
+    func setNotchMode(_ on: Bool) {
+        prefs.notchMode = on
+        if on {
+            stage.cancelDrag()
+            stage.hide()
+            notch.show()
+        } else {
+            notch.hide()
+            stage.show()
+        }
+    }
+
+    var playerShown: Bool { prefs.notchMode ? notch.isShown : stage.isShown }
+
+    func togglePlayer() {
+        if prefs.notchMode {
+            notch.isShown ? notch.hide() : notch.show()
+        } else {
+            stage.toggle()
+        }
+    }
 
     func setCompact(_ compact: Bool) {
         guard prefs.compactView != compact else { return }
@@ -298,6 +344,7 @@ final class Hub {
 
 enum PrefKey {
     static let compactView = "minideck.compactView"
+    static let notchMode = "minideck.notchMode"
     static let soundBars = "minideck.soundBars"
     static let loginSeeded = "minideck.loginSeeded"
     static let askedCapture = "minideck.askedCapture"
@@ -313,6 +360,9 @@ enum PrefKey {
 final class Prefs {
     var compactView: Bool {
         didSet { UserDefaults.standard.set(compactView, forKey: PrefKey.compactView) }
+    }
+    var notchMode: Bool {
+        didSet { UserDefaults.standard.set(notchMode, forKey: PrefKey.notchMode) }
     }
     var soundBars: Bool {
         didSet { UserDefaults.standard.set(soundBars, forKey: PrefKey.soundBars) }
@@ -337,6 +387,7 @@ final class Prefs {
     init() {
         let store = UserDefaults.standard
         compactView = store.bool(forKey: PrefKey.compactView)
+        notchMode = store.bool(forKey: PrefKey.notchMode)
         soundBars = store.object(forKey: PrefKey.soundBars) as? Bool ?? Metrics.soundBarsOn
         choice = store.string(forKey: PrefKey.choice).flatMap(SourceChoice.init(rawValue:)) ?? .automatic
         countPlays = store.object(forKey: PrefKey.countPlays) as? Bool ?? true
@@ -361,7 +412,7 @@ struct StatusMenu: View {
     let hub: Hub
 
     var body: some View {
-        Button(hub.stage.isShown ? "Hide Player" : "Show Player") { hub.stage.toggle() }
+        Button(hub.playerShown ? "Hide Player" : "Show Player") { hub.togglePlayer() }
         Button("Open \(hub.deck.source.appName)") { hub.deck.revealApp() }
         Menu("Follow") {
             ForEach(SourceChoice.allCases) { option in
@@ -374,6 +425,7 @@ struct StatusMenu: View {
                 Button(corner.title) { hub.stage.park(at: corner) }
             }
         }
+        .disabled(hub.prefs.notchMode)
         Divider()
         Button("Listening History…") { hub.showHistory() }
             .keyboardShortcut("y")
@@ -419,8 +471,11 @@ struct StatusMenu: View {
             Button("Clear Listening History…") { hub.confirmClearHistory() }
                 .disabled(hub.log.isEmpty)
         }
+        Toggle("Show in Notch", isOn: Binding(get: { hub.prefs.notchMode },
+                                              set: { hub.setNotchMode($0) }))
         Toggle("Compact View", isOn: Binding(get: { hub.prefs.compactView },
                                              set: { hub.setCompact($0) }))
+            .disabled(hub.prefs.notchMode)
         Toggle("Sound Bars", isOn: Binding(get: { hub.prefs.soundBars },
                                            set: { hub.prefs.soundBars = $0 }))
         Toggle("Open at Login", isOn: Binding(get: { hub.prefs.openAtLogin },

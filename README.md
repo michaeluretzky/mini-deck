@@ -47,6 +47,7 @@ Mini Deck checks playback every second only while a song plays and the player is
   3. **Your listening:** your own history with this song, this artist and this album (see below).
 - **Listening History** window (menu bar > Listening History, or ⌘Y): your recent plays, top songs, top artists and top albums.
 - Follows whichever app is playing, or one app you choose (menu bar > Follow).
+- **Show in Notch** (menu bar > Show in Notch): the player moves into the camera notch, like the Dynamic Island. Closed, the cover and sound bars sit beside the notch. Point at it to open the player with its buttons and playback bar. Move the pointer away and it closes. On a screen without a notch, it sits at the top center of the screen. Turn the option off to bring back the floating card.
 
 ## Your listening stats
 
