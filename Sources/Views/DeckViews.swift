@@ -1040,13 +1040,14 @@ struct SummaryRow: View {
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .truncationMode(.tail)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
-                .help(tile.value + " " + tile.caption + (tile.supplement.map { " · \($0) in saved history" } ?? ""))
+                .help(tile.helpText)
             }
         }
     }
@@ -1131,7 +1132,7 @@ struct StatCell: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
-        .help(tile.value + " " + tile.caption + (tile.supplement.map { " · \($0) in saved history" } ?? ""))
+        .help(tile.helpText)
     }
 }
 

@@ -141,12 +141,12 @@ struct WindowChecks {
         // Optional preview uses the actual production component and synthetic fixtures.
         if let index = CommandLine.arguments.firstIndex(of: "--preview"), index + 1 < CommandLine.arguments.count {
             var report = ListeningReport()
-            report.song.add([StatTile(value: "53", caption: "overall plays", symbol: "play.circle",
-                                     supplement: "/ 12,345")], from: "Preview")
-            report.artist.add([StatTile(value: "219", caption: "overall plays", symbol: "play.circle",
-                                       supplement: "/ 2,345")], from: "Preview")
-            report.album.add([StatTile(value: "86", caption: "overall plays", symbol: "play.circle",
-                                      supplement: "/ 6,789")], from: "Preview")
+            report.song.add([StatTile(value: "53", caption: "12,345 songs heard", symbol: "play.circle",
+                                     supplement: "plays")], from: "Preview")
+            report.artist.add([StatTile(value: "219", caption: "2,345 artists heard", symbol: "play.circle",
+                                       supplement: "plays")], from: "Preview")
+            report.album.add([StatTile(value: "86", caption: "6,789 albums heard", symbol: "play.circle",
+                                      supplement: "plays")], from: "Preview")
             let view = VStack(alignment: .leading, spacing: 10) {
                 Heading(text: "Your Spotify")
                 SummaryRow(report: report, tint: Color(red: 0.55, green: 0.52, blue: 0.9))

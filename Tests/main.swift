@@ -283,9 +283,12 @@ await MainActor.run {
         expect(indexed.songsByArtist[TitleTidy.key(event.artist)]?.count == 2, "artist song list groups aliases but preserves remix")
         let details = StatsBook.importedReport(track: remoteTrack, snapshot: indexed, coverage: "test")
         expect(details.song.tiles.first?.value == "2", "current song includes its alternate Spotify IDs")
-        expect(details.song.tiles.first?.supplement == "/ 2", "song suffix shows only slash and unique song total")
-        expect(details.artist.tiles.first?.supplement == "/ 1", "artist suffix shows only slash and saved artist total")
-        expect(details.album.tiles.first?.supplement == "/ 1", "album suffix shows only slash and saved album total")
+        expect(details.song.tiles.first?.supplement == "plays", "song count reads as plays")
+        expect(details.song.tiles.first?.caption == "2 songs heard", "song caption names the unique song total")
+        expect(details.artist.tiles.first?.caption == "1 artist heard", "artist caption names the saved artist total")
+        expect(details.album.tiles.first?.caption == "1 album heard", "album caption names the saved album total")
+        expect(details.song.tiles.first?.helpText == "2 plays · 2 songs heard in your saved history", "hover text reads as a sentence")
+        expect(StatsBook.heardCaption(30833, "song") == "30,833 songs heard", "large totals use grouping")
         expect(details.album.tiles.contains { $0.caption == "songs in saved history" && $0.value == "2" },
                "album unique-song count uses grouped titles")
         expect(AccountHistory.songs(recent: [], historical: [], imported: indexed.songs).count == 2,
