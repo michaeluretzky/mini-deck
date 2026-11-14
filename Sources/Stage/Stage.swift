@@ -42,7 +42,7 @@ final class DeckPanel: NSPanel {
 
 /// Hosts the SwiftUI card and reports the pointer even when the app isn't active.
 final class DeckHostView<Content: View>: NSHostingView<Content> {
-    var scrollHandler: ((NSEvent) -> Void)?
+    var scrollHandler: ((NSEvent) -> Bool)?
     var pointerHandler: ((CGPoint?) -> Void)?
     private var tracker: NSTrackingArea?
 
@@ -68,13 +68,16 @@ final class DeckHostView<Content: View>: NSHostingView<Content> {
     override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); publish(event) }
     override func mouseDragged(with event: NSEvent) { super.mouseDragged(with: event); publish(event) }
     override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); pointerHandler?(nil) }
-    override func scrollWheel(with event: NSEvent) { scrollHandler?(event) }
+    override func scrollWheel(with event: NSEvent) {
+        if scrollHandler?(event) != true { super.scrollWheel(with: event) }
+    }
 }
 
 /// The floating window: dragging, edge magnets, preset spots, and growing to fit its content.
 @MainActor @Observable
 final class Stage {
     private(set) var isShown = false
+    private(set) var maxPanelHeight: CGFloat = 800
     @ObservationIgnored private var panel: DeckPanel?
     @ObservationIgnored private var grab: (mouse: NSPoint, origin: NSPoint)?
     @ObservationIgnored private var pendingFit: (height: CGFloat, width: CGFloat, growDown: Bool)?
@@ -84,7 +87,7 @@ final class Stage {
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
 
-    func build<V: View>(_ root: V, scroll: @escaping (NSEvent) -> Void, pointer: @escaping (CGPoint?) -> Void) {
+    func build<V: View>(_ root: V, scroll: @escaping (NSEvent) -> Bool, pointer: @escaping (CGPoint?) -> Void) {
         let start = NSRect(x: 0, y: 0, width: Metrics.panelWidth, height: 164)
         let host = DeckHostView(rootView: root)
         host.sizingOptions = []
@@ -212,6 +215,7 @@ final class Stage {
     func settle() {
         guard let panel else { return }
         var f = panel.frame
+        if let area = playArea(for: f), maxPanelHeight != area.height { maxPanelHeight = area.height }
         f.origin = magnetize(f, clamp: true)
         // Automatic display correction should not queue an animation behind pointer motion.
         panel.setFrame(f, display: true, animate: false)

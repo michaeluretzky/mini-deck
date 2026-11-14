@@ -30,6 +30,11 @@ final class Pointer {
 
     func over(_ id: String) -> Bool { hovered.contains(id) }
 
+    func remove(_ id: String) {
+        zones.removeValue(forKey: id)
+        evaluate()
+    }
+
     /// Discard stale normal/compact hit regions and pending hover work on resize.
     func resetLayout() {
         opener?.cancel()
@@ -85,6 +90,7 @@ final class Pointer {
 }
 
 enum Zone {
+    static let drawer = "drawer"
     static let card = "card"
     static let cover = "cover"
     static let transport = "transport"

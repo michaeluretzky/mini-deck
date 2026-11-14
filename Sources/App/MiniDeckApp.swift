@@ -60,7 +60,7 @@ final class Hub {
         account.onNotice = { [weak self] text in self?.deck.flash("person.crop.circle.badge.checkmark", text) }
         stage.onScaleChange = { [weak self] scale in self?.deck.pixelScale = scale }
         stage.build(DeckRoot(hub: self),
-                    scroll: { [weak self] event in self?.scrolled(event) },
+                    scroll: { [weak self] event in self?.scrolled(event) ?? false },
                     pointer: { [weak self] point in self?.pointer.location = point })
         deck.pixelScale = stage.scale
         deck.start()
@@ -90,11 +90,14 @@ final class Hub {
         }
     }
 
-    private func scrolled(_ event: NSEvent) {
+    private func scrolled(_ event: NSEvent) -> Bool {
+        // Let the bounded information panel scroll instead of changing volume.
+        guard !pointer.over(Zone.drawer) else { return false }
         var dy = event.scrollingDeltaY
         if event.isDirectionInvertedFromDevice { dy = -dy }
-        guard dy != 0 else { return }
+        guard dy != 0 else { return false }
         deck.adjustVolume(by: event.hasPreciseScrollingDeltas ? Double(dy) * 0.4 : Double(dy) * 3)
+        return true
     }
 
     /// Re-runs whenever the sound-bar setting, the play state or the followed app changes.
