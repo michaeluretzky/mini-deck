@@ -264,6 +264,10 @@ await MainActor.run {
     expect(restoredJournal?.additions(after: nil) == additions, "forward history survives restart")
     restoredJournal?.ingest([apiOnly], now: baseTime.addingTimeInterval(101))
     expect(restoredJournal?.additions(after: nil).count == 3, "restart does not duplicate repeated API records")
+    current.position = 30
+    _ = restoredJournal?.observe(current, now: baseTime.addingTimeInterval(64))
+    expect(restoredJournal?.records.filter { $0.kind == "mac" }.count == 2, "same playing session survives a longer app restart")
+    expect(restoredJournal?.records.last(where: { $0.kind == "mac" })?.milliseconds == 0, "restart gap adds no unobserved listening time")
     var onlyMusic = SpotifyJournal()
     current.source = .music
     _ = onlyMusic.observe(current, now: baseTime)

@@ -45,7 +45,10 @@ struct SpotifyJournal: Codable, Sendable {
             let restarted = snap.position < 3 && record.position > snap.position + 3
             // Do not turn a long unobserved gap into continuous listening.
             let continuous = elapsed >= 0 && elapsed <= 15
-            if same && !restarted && (continuous || !record.playing) {
+            let resumedSession = elapsed >= 0 && elapsed <= 86_400
+                && snap.position >= record.position
+                && abs((snap.position - record.position) - elapsed) <= 3
+            if same && !restarted && (continuous || resumedSession || !record.playing) {
                 let delta = record.playing && elapsed <= 5 ? max(0, elapsed) : 0
                 record.milliseconds += Int64(delta * 1000)
                 record.ended = now
