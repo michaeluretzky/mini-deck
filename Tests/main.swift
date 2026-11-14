@@ -493,6 +493,60 @@ func checkOngoingPersistence() async {
 
 /// The card redraws only for visible changes, and hover lookups stay indexed.
 @MainActor
+func checkEnergy() {
+    typealias C = EnergyPolicy.Context
+    let watching = C(playing: true, visible: true, awake: true, lowPower: false, appRunning: true)
+    expect(EnergyPolicy.pollInterval(watching) == 1, "playing on screen checks every second")
+    var c = watching; c.lowPower = true
+    expect(EnergyPolicy.pollInterval(c) == 2, "Low Power Mode halves checks")
+    expect(EnergyPolicy.progressStep(c) == 0.5, "Low Power Mode slows the progress bar")
+    expect(!EnergyPolicy.animates(c), "Low Power Mode stops animations")
+    c = watching; c.visible = false
+    expect(EnergyPolicy.pollInterval(c) == 4, "hidden but playing keeps counting plays")
+    expect(EnergyPolicy.progressStep(c) == 30, "hidden progress bar rests")
+    expect(!EnergyPolicy.animates(c), "hidden sound bars rest")
+    c = watching; c.awake = false
+    expect(EnergyPolicy.pollInterval(c) == 4, "display asleep but playing keeps counting plays")
+    expect(!EnergyPolicy.refreshesAccount(c), "account refresh waits while asleep")
+    c = watching; c.playing = false
+    expect(EnergyPolicy.pollInterval(c) == 5, "paused on screen checks every 5 seconds")
+    c.visible = false
+    expect(EnergyPolicy.pollInterval(c) == 30, "paused and hidden checks every 30 seconds")
+    c = watching; c.appRunning = false
+    expect(EnergyPolicy.pollInterval(c) == 5, "no music app open: 5 seconds")
+    c.awake = false
+    expect(EnergyPolicy.pollInterval(c) == 30, "no music app and asleep: 30 seconds")
+    for playing in [true, false] { for visible in [true, false] { for awake in [true, false] { for low in [true, false] {
+        let x = C(playing: playing, visible: visible, awake: awake, lowPower: low, appRunning: true)
+        let interval = EnergyPolicy.pollInterval(x)
+        expect(interval >= 1 && interval <= 30, "interval in range")
+        if playing { expect(interval <= 4, "playing never checks slower than the listen window") }
+        expect(EnergyPolicy.listenGap(forInterval: interval) > interval, "listen gap covers the interval")
+    } } } }
+
+    // Slower checks while hidden still add up the full listening time.
+    let log = ListeningLog(persist: false)
+    log.clear()
+    var snap = Snapshot()
+    snap.source = .spotify
+    snap.state = .playing
+    snap.title = "Low Tide"
+    snap.artist = "Harbor"
+    snap.album = "Shoreline"
+    var clock = Date()
+    let gap = EnergyPolicy.listenGap(forInterval: 4)
+    for step in 0..<16 {
+        snap.position = Double(step * 4)
+        log.tick(snap, now: clock, gap: gap)
+        clock = clock.addingTimeInterval(4)
+    }
+    expect(log.song(artist: "Harbor", title: "Low Tide")?.seconds == 60, "4-second checks count every second")
+    expect(log.song(artist: "Harbor", title: "Low Tide")?.plays == 1, "4-second checks count one play")
+    log.tick(snap, now: clock.addingTimeInterval(600), gap: gap)
+    expect(log.song(artist: "Harbor", title: "Low Tide")?.seconds ?? 0 <= 65, "long sleep is not counted as listening")
+}
+
+@MainActor
 func checkResponsiveness() {
     var a = Snapshot()
     a.title = "Song"; a.artist = "Artist"; a.state = .playing; a.position = 10; a.length = 200
@@ -725,5 +779,6 @@ await checkOngoingPersistence()
 await checkWrapped()
 await checkPointer()
 checkResponsiveness()
+checkEnergy()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

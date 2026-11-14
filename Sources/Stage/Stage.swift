@@ -91,6 +91,8 @@ final class Stage {
     @ObservationIgnored private var drawerExpanded = false
     @ObservationIgnored private var adjustingFrame = false
     @ObservationIgnored var onScaleChange: ((CGFloat) -> Void)?
+    /// Reports whether the player can be seen: shown, and not fully covered or on a sleeping display.
+    @ObservationIgnored var onVisibility: ((Bool) -> Void)?
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
 
@@ -130,6 +132,9 @@ final class Stage {
                 }
             }
         }
+        center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: p, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reportVisibility() }
+        }
         center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.settle() }
         }
@@ -143,14 +148,21 @@ final class Stage {
         panel.orderFrontRegardless()
         isShown = true
         settle()
+        reportVisibility()
     }
 
     func hide() {
         panel?.orderOut(nil)
         isShown = false
+        reportVisibility()
     }
 
     func toggle() { isShown ? hide() : show() }
+
+    private func reportVisibility() {
+        guard let panel else { return }
+        onVisibility?(isShown && panel.occlusionState.contains(.visible))
+    }
 
     // MARK: Geometry
 

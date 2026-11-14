@@ -2,6 +2,7 @@
 // Free for personal use. See LICENSE.
 
 import AppKit
+import CoreServices
 
 /// A music app Mini Deck can follow and control.
 enum Source: String, CaseIterable, Identifiable, Sendable {
@@ -102,6 +103,31 @@ enum Players {
     static func reveal(_ source: Source) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.bundle) else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    enum Control: Sendable { case allowed, notAsked, denied, unknown }
+
+    /// Mini Deck's permission to control this app (Privacy & Security > Automation).
+    /// With `ask`, shows the macOS prompt if the user has not answered yet; this blocks,
+    /// so call it off the main thread.
+    nonisolated static func control(_ source: Source, ask: Bool = false) -> Control {
+        var target = AEAddressDesc()
+        let id = Array(source.bundle.utf8)
+        guard AECreateDesc(typeApplicationBundleID, id, id.count, &target) == noErr else { return .unknown }
+        defer { AEDisposeDesc(&target) }
+        switch AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, ask) {
+        case noErr: return .allowed
+        case OSStatus(errAEEventWouldRequireUserConsent): return .notAsked
+        case OSStatus(errAEEventNotPermitted): return .denied
+        default: return .unknown
+        }
+    }
+
+    /// Opens the Automation privacy settings, where control of music apps is allowed.
+    static func openAutomationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     static func isInstalled(_ source: Source) -> Bool {

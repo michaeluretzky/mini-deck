@@ -22,6 +22,8 @@ final class Deck {
     private(set) var source: Source = .spotify
     /// Whether that app is running.
     private(set) var appOpen = false
+    /// The app is open but the user has not allowed Mini Deck to control it.
+    private(set) var controlBlocked = false
     private(set) var track = Snapshot()
     private(set) var facts: LibraryFacts?
     private(set) var cover: NSImage?
@@ -52,6 +54,8 @@ final class Deck {
     @ObservationIgnored var choice: SourceChoice = .automatic
     @ObservationIgnored var onTick: ((Snapshot) -> Void)?
     @ObservationIgnored var onNewTrack: ((Snapshot) -> Void)?
+    /// Display, visibility and power state; slows background work when nobody is watching.
+    @ObservationIgnored var energy: Energy?
     @ObservationIgnored private var coverSource: CGImage?
     @ObservationIgnored var pixelScale: CGFloat = 2 {
         didSet { if pixelScale != oldValue { rerenderCover() } }
@@ -93,10 +97,50 @@ final class Deck {
                 MainActor.assumeIsolated { self?.refresh() }
             }
         }
+        // Notice a music app opening or quitting at once, without fast polling while none is open.
+        let bundles = Set(Source.allCases.map(\.bundle))
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                guard let id = app?.bundleIdentifier, bundles.contains(id) else { return }
+                MainActor.assumeIsolated { self?.repace() }
+            }
+        }
+        repace()
+    }
+
+    @ObservationIgnored private var asking: Set<Source> = []
+
+    /// Shows the macOS permission prompt once per launch for an app the user has not answered for.
+    private func askForControl(_ app: Source) {
+        guard !asking.contains(app) else { return }
+        asking.insert(app)
+        Task { [weak self] in
+            _ = await Task.detached(priority: .userInitiated) { Players.control(app, ask: true) }.value
+            self?.refresh()
+        }
+    }
+
+    /// The current situation, for choosing how often to check and redraw.
+    var energyContext: EnergyPolicy.Context {
+        energy?.context(playing: isPlaying, appRunning: appOpen)
+            ?? EnergyPolicy.Context(playing: isPlaying, visible: true, awake: true, lowPower: false, appRunning: appOpen)
+    }
+
+    /// Seconds between playback checks right now.
+    var pollSeconds: Double { EnergyPolicy.pollInterval(energyContext) }
+
+    /// Refreshes now and restarts the check loop at the pace that fits the current situation.
+    func repace() {
+        pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                self?.refresh()
-                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                let before = self.pollSeconds
+                self.refresh()
+                // A play, pause or open/close changes the pace; apply it from the next check.
+                let wait = min(before, self.pollSeconds)
+                try? await Task.sleep(for: .seconds(wait))
             }
         }
     }
@@ -120,6 +164,15 @@ final class Deck {
         if app != source { source = app }
         let open = Players.isRunning(app)
         if open != appOpen { appOpen = open }
+        var blocked = false
+        if open && read == nil {
+            switch Players.control(app) {
+            case .denied: blocked = true
+            case .notAsked: askForControl(app)
+            default: break
+            }
+        }
+        if blocked != controlBlocked { controlBlocked = blocked }
         guard open, let snap = read else {
             if track.state != .stopped { track = Snapshot(source: app) }
             return

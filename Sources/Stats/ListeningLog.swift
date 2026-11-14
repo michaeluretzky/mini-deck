@@ -57,7 +57,9 @@ final class ListeningLog {
 
     // MARK: Counting
 
-    func tick(_ snap: Snapshot, now: Date = Date()) {
+    /// `gap` is the longest pause between checks that still counts as listening.
+    /// Checks slow down while the player is hidden, so the gap follows the check pace.
+    func tick(_ snap: Snapshot, now: Date = Date(), gap: TimeInterval = 2) {
         guard enabled, snap.state == .playing, !snap.title.isEmpty else {
             lastTick = nil
             return
@@ -71,7 +73,7 @@ final class ListeningLog {
             counted = false
         }
         lastPosition = snap.position
-        let delta = lastTick.map { min(max(0, now.timeIntervalSince($0)), 2) } ?? 0
+        let delta = lastTick.map { min(max(0, now.timeIntervalSince($0)), max(2, gap)) } ?? 0
         lastTick = now
         guard delta > 0 || !counted else { return }
 

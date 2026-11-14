@@ -24,6 +24,10 @@ To check the download, compare `shasum -a 256 Mini-Deck-<version>.zip` with the 
 
 To update, quit Mini Deck, replace the app in Applications, and open it again. macOS may ask for permissions again.
 
+## Energy use
+
+Mini Deck checks playback every second only while a song plays and the player is visible. When the player is hidden or the display sleeps, it checks every 4 seconds and keeps counting plays. Paused, it checks every 5 seconds (30 seconds when hidden). Low Power Mode halves the visible check rate and stops animations.
+
 ## Getting started
 
 - **Apple Music:** nothing to set up. Play something in the Music app.

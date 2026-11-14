@@ -33,8 +33,8 @@ struct DeckCard: View {
         let sw = deck.swatch
         let hot = pointer.over(Zone.card)
         VStack(alignment: .leading, spacing: prefs.compactView ? 8 : 12) {
-            // The cover spans the full player height; the playback bar starts at the
-            // same leading edge as the song, artist and album rows.
+            // The cover spans the full player height; the playback bar sits at the bottom,
+            // centered under the playback buttons.
             let compact = prefs.compactView
             let rowGap: CGFloat = compact ? 5 : 8
             let coverSide = hub.cardSizing.coverSide(compact: compact, spacing: rowGap)
@@ -57,9 +57,9 @@ struct DeckCard: View {
                     })
                     Spacer(minLength: 0)
                     if deck.hasTrack {
-                        // Start the bar where the song, artist and album text begins (after the icons).
+                        // Centered under the playback buttons, with equal space on both sides.
                         Scrubber(deck: deck, pointer: pointer, scale: compact ? 2.0 / 3.0 : 1)
-                            .padding(.leading, NowPlayingColumn.textInset(compact: compact))
+                            .padding(.horizontal, NowPlayingColumn.textInset(compact: compact))
                             .background(GeometryReader { g in
                                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in
                                     if abs(hub.cardSizing.scrubHeight - height) > 0.5 { hub.cardSizing.scrubHeight = height }
@@ -201,7 +201,8 @@ struct NowPlayingColumn: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .help(deck.track.title)
                     if prefs.soundBars {
-                        SoundBars(spectrum: spectrum, playing: deck.isPlaying, tint: deck.swatch.lead)
+                        SoundBars(spectrum: spectrum, playing: deck.isPlaying && EnergyPolicy.animates(deck.energyContext),
+                                  tint: deck.swatch.lead)
                             .scaleEffect(scale, anchor: .trailing)
                             .frame(width: 21 * scale)
                             .accessibilityHidden(true)
@@ -282,14 +283,20 @@ struct IdleColumn: View {
     var body: some View {
         let name = deck.source.appName
         VStack(alignment: .leading, spacing: 7) {
-            Text(deck.appOpen ? "Nothing is playing" : "No music app is open")
+            Text(deck.controlBlocked ? "Allow Mini Deck to control \(name)"
+                 : deck.appOpen ? "Nothing is playing" : "No music app is open")
                 .font(.system(size: 15, weight: .semibold))
-            Text(deck.appOpen ? "Start a song in \(name) and it will appear here."
-                              : "Open Spotify or Apple Music to control it from here.")
+                .fixedSize(horizontal: false, vertical: true)
+            Text(deck.controlBlocked ? "Turn on \(name) under Mini Deck in Privacy & Security > Automation."
+                 : deck.appOpen ? "Start a song in \(name) and it will appear here."
+                 : "Open Spotify or Apple Music to control it from here.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if deck.appOpen {
+            if deck.controlBlocked {
+                Button("Open Settings") { Players.openAutomationSettings() }
+                    .controlSize(.small)
+            } else if deck.appOpen {
                 Button("Bring \(name) Forward") { deck.revealApp() }
                     .controlSize(.small)
             } else {
@@ -425,7 +432,7 @@ struct Scrubber: View {
     private var dragFraction: Double? { pointer.scrub }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: deck.isPlaying ? 0.25 : 30)) { context in
+        TimelineView(.periodic(from: .now, by: EnergyPolicy.progressStep(deck.energyContext))) { context in
             let length = deck.track.length
             let played = deck.elapsed(at: context.date)
             let fraction = dragFraction ?? (length > 0 ? played / length : 0)
