@@ -4,7 +4,7 @@ Ongoing Spotify history now begins on first launch. Mini Deck privately saves ob
 
 All valid music records now count as **overall plays**, including short listens, with no minimum-duration threshold. Listening time uses only known measured duration; API-only records do not invent it. The private ongoing journal survives restarts and has a separate clear control. Existing imports are not modified by this change.
 
-Compact mode is a mini version of the normal player: left-aligned song, artist and album rows with their icons, the same five playback controls, and a smaller seekable playback strip with time labels. It uses the same view components at two-thirds scale rather than a different centered layout. The small service icon remains at the top-right; hover details stay limited to song and artist.
+Compact mode is a mini version of the normal player: left-aligned song, artist and album rows with their icons and the same five playback controls. Shared components use tighter spacing, while text stays readable at 12.5-point title, 10.5-point artist and 10-point album sizes. Both layouts put a full-width seekable playback strip at the bottom of the player, with time labels beside the bar to save height. The small service icon remains at the top-right; hover details stay limited to song and artist.
 
 Repeated Spotify IDs with identical title, artist and album metadata now share one displayed song row with summed plays. Original records and IDs remain intact; explicitly different live/remix/version labels remain separate. This applies to song details, artist/album lists, unique-song counts and combined history.
 

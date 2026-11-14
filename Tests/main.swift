@@ -444,13 +444,19 @@ func checkOngoingPersistence() async {
 
 @MainActor
 func checkPointer() async {
+    func waitFor(_ condition: @MainActor () -> Bool) async {
+        for _ in 0..<100 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
     let pointer = Pointer()
     pointer.register(Zone.card, CGRect(x: 0, y: 0, width: 448, height: 700))
     pointer.register(Zone.cover, CGRect(x: 12, y: 12, width: 132, height: 132))
     pointer.register(Zone.transport, CGRect(x: 170, y: 100, width: 240, height: 40))
     pointer.register(Zone.scrubber, CGRect(x: 170, y: 155, width: 240, height: 30))
     pointer.location = CGPoint(x: 20, y: 20)
-    try? await Task.sleep(for: .milliseconds(180))
+    await waitFor { pointer.drawerOpen }
     expect(pointer.drawerOpen, "cover hover opens the drawer")
     nonisolated(unsafe) var invalidations = 0
     withObservationTracking {
@@ -479,10 +485,10 @@ func checkPointer() async {
     pointer.frozen = true
     expect(!pointer.drawerOpen && pointer.hovered.isEmpty, "drag freeze closes and clears hover")
     pointer.frozen = false
-    try? await Task.sleep(for: .milliseconds(180))
+    await waitFor { pointer.drawerOpen }
     expect(pointer.drawerOpen, "unfreezing restores hover without extra pointer motion")
     pointer.location = nil
-    try? await Task.sleep(for: .milliseconds(180))
+    await waitFor { !pointer.drawerOpen }
     expect(!pointer.drawerOpen, "real pointer exit closes after grace period")
     pointer.location = CGPoint(x: 20, y: 20)
     pointer.scrub = 0.5
@@ -491,9 +497,9 @@ func checkPointer() async {
     expect(pointer.zones.isEmpty && pointer.hovered.isEmpty, "mode change clears stale hover regions")
     expect(!pointer.drawerOpen && pointer.scrub == nil, "mode change cancels pending drawer and scrub")
     pointer.register(Zone.card, CGRect(x: 0, y: 0, width: 300, height: 250))
-    pointer.register(Zone.cover, CGRect(x: 10, y: 10, width: 60, height: 60))
+    pointer.register(Zone.cover, CGRect(x: 10, y: 10, width: 88, height: 88))
     pointer.location = CGPoint(x: 25, y: 25)
-    try? await Task.sleep(for: .milliseconds(160))
+    await waitFor { pointer.drawerOpen }
     expect(pointer.drawerOpen, "compact cover opens its hover panel after a layout reset")
 }
 

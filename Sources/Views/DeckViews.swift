@@ -33,6 +33,7 @@ struct DeckCard: View {
         let sw = deck.swatch
         let hot = pointer.over(Zone.card)
         VStack(alignment: .leading, spacing: prefs.compactView ? 8 : 12) {
+            VStack(spacing: prefs.compactView ? 5 : 8) {
             HStack(alignment: .top, spacing: prefs.compactView ? 10 : 14) {
                 CoverTile(deck: deck, pointer: pointer, side: prefs.compactView ? 88 : Metrics.cover)
                 Group {
@@ -44,6 +45,10 @@ struct DeckCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+                if deck.hasTrack {
+                    Scrubber(deck: deck, pointer: pointer, scale: prefs.compactView ? 2.0 / 3.0 : 1)
+                }
             }
             .background(GeometryReader { g in
                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in hub.cardSizing.playerHeight = height }
@@ -162,10 +167,11 @@ struct NowPlayingColumn: View {
                         .frame(width: 16 * scale)
                         .accessibilityHidden(true)
                     Text(deck.track.title)
-                        .font(.system(size: 15 * scale, weight: .bold))
+                        .font(.system(size: compact ? 12.5 : 15, weight: .bold))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(deck.track.title)
                     if prefs.soundBars {
                         SoundBars(spectrum: spectrum, playing: deck.isPlaying, tint: deck.swatch.lead)
                             .scaleEffect(scale, anchor: .trailing)
@@ -180,15 +186,17 @@ struct NowPlayingColumn: View {
                     Text(deck.track.artist)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .help(deck.track.artist)
                 }
-                .font(.system(size: 12.5 * scale, weight: .medium)).foregroundStyle(.secondary)
+                .font(.system(size: compact ? 10.5 : 12.5, weight: .medium)).foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 8 * scale) {
                     Image(systemName: "opticaldisc").frame(width: 16 * scale).accessibilityHidden(true)
                     Text(deck.track.album)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .help(deck.track.album)
                 }
-                .font(.system(size: 11.5 * scale)).foregroundStyle(.secondary)
+                .font(.system(size: compact ? 10 : 11.5)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6 * scale)
@@ -199,8 +207,6 @@ struct NowPlayingColumn: View {
                 .frame(maxWidth: .infinity)
                 .zone(Zone.transport, pointer)
 
-            Scrubber(deck: deck, pointer: pointer, scale: scale)
-                .padding(.top, 4 * scale)
         }
     }
 }
@@ -384,17 +390,16 @@ struct Scrubber: View {
             let played = deck.elapsed(at: context.date)
             let fraction = dragFraction ?? (length > 0 ? played / length : 0)
             let shown = dragFraction.map { $0 * length } ?? played
-            VStack(spacing: 2) {
-                bar(fraction)
-                HStack {
+            HStack(spacing: 6) {
                     Text(Clock.short(shown))
                         .foregroundStyle(dragFraction == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(deck.swatch.lead))
-                    Spacer()
+                        .fixedSize()
+                    bar(fraction)
                     Text("-" + Clock.short(max(0, length - shown)))
                         .foregroundStyle(.secondary)
-                }
-                .font(.system(size: 10 * scale, weight: .medium).monospacedDigit())
+                        .fixedSize()
             }
+            .font(.system(size: max(8.5, 10 * scale), weight: .medium).monospacedDigit())
         }
     }
 
