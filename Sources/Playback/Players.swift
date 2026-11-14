@@ -58,6 +58,18 @@ struct Snapshot: Equatable {
     var volume = 0
 
     var primaryArtist: String { artist.components(separatedBy: ", ").first ?? artist }
+
+    /// Position changes every poll; everything else decides whether the card must redraw.
+    func matchesIgnoringPosition(_ other: Snapshot) -> Bool {
+        var copy = self
+        copy.position = other.position
+        return copy == other
+    }
+
+    /// Playing clocks tolerate polling drift; paused clocks follow any reported move.
+    static func needsReanchor(predicted: Double, reported: Double, playing: Bool, newTrack: Bool) -> Bool {
+        newTrack || abs(predicted - reported) > (playing ? 0.75 : 0.05)
+    }
 }
 
 // Disambiguates the playback reading from SpotifyArchive.Snapshot.

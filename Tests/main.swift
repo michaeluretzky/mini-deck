@@ -491,6 +491,52 @@ func checkOngoingPersistence() async {
     } catch { expect(false, "forward persistence: \(error.localizedDescription)") }
 }
 
+/// The card redraws only for visible changes, and hover lookups stay indexed.
+@MainActor
+func checkResponsiveness() {
+    var a = Snapshot()
+    a.title = "Song"; a.artist = "Artist"; a.state = .playing; a.position = 10; a.length = 200
+    var b = a
+    b.position = 11
+    expect(b.matchesIgnoringPosition(a), "position-only poll does not rebuild the card")
+    b.title = "Other"
+    expect(!b.matchesIgnoringPosition(a), "a new title rebuilds the card")
+    var paused = a
+    paused.state = .paused
+    expect(!paused.matchesIgnoringPosition(a), "play-state changes rebuild the card")
+    expect(!Snapshot.needsReanchor(predicted: 10.4, reported: 10, playing: true, newTrack: false),
+           "playing clock ignores polling drift")
+    expect(Snapshot.needsReanchor(predicted: 30, reported: 10, playing: true, newTrack: false),
+           "playing clock follows a seek")
+    expect(Snapshot.needsReanchor(predicted: 10.2, reported: 10, playing: false, newTrack: false),
+           "paused clock follows the reported position")
+    expect(Snapshot.needsReanchor(predicted: 10, reported: 10, playing: true, newTrack: true),
+           "new track resets the clock")
+
+    var songs: [MusicLibrary.Song] = []
+    for i in 0..<6000 {
+        songs.append(MusicLibrary.Song(title: "Song \(i)", artist: "Artist \(i % 300)", album: "Album \(i % 900) (Deluxe)",
+                                       albumArtist: i % 7 == 0 ? "Various Artists" : "", plays: i % 11,
+                                       lastPlayed: nil))
+    }
+    var scan = MusicLibrary.Scan()
+    scan.all = songs
+    let library = MusicLibrary()
+    library.apply(scan)
+    let brute = songs.filter { TitleTidy.key($0.artist) == TitleTidy.key("Artist 42")
+        || TitleTidy.key($0.albumArtist) == TitleTidy.key("Artist 42") }
+    expect(library.songs(byArtist: "artist 42") == brute, "indexed artist lookup matches a full scan")
+    let bruteAlbum = songs.filter { TitleTidy.key($0.album) == TitleTidy.key("Album 42")
+        && TitleTidy.key($0.artist) == TitleTidy.key("Artist 42") }
+    expect(library.songs(onAlbum: "Album 42", artists: ["Artist 42"]) == bruteAlbum,
+           "indexed album lookup matches a full scan")
+    expect(library.songs(byArtist: "Various Artists").count == songs.filter { $0.albumArtist == "Various Artists" }.count,
+           "album-artist credits are indexed")
+    let start = Date()
+    for i in 0..<500 { _ = library.songs(byArtist: "Artist \(i % 300)") }
+    expect(Date().timeIntervalSince(start) < 0.25, "500 hover lookups over 6,000 songs stay under 250 ms")
+}
+
 @MainActor
 func checkPointer() async {
     func waitFor(_ condition: @MainActor () -> Bool) async {
@@ -678,5 +724,6 @@ await checkImportPersistence()
 await checkOngoingPersistence()
 await checkWrapped()
 await checkPointer()
+checkResponsiveness()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

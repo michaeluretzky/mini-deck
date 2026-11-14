@@ -49,6 +49,7 @@ final class Hub {
     let library = MusicLibrary()
     let archive = SpotifyArchive()
     let wrapped = WrappedLibrary()
+    let statsMemo = StatsMemo()
     private let historyWindow = HistoryWindow()
     private let setupWindow = SetupWindow()
     private var started = false

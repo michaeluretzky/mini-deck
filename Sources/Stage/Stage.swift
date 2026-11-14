@@ -9,6 +9,8 @@ enum Metrics {
     static let card: CGFloat = 448        // card width
     static let compactCard: CGFloat = 300
     static let cover: CGFloat = 132       // album art side
+    static let compactCover: CGFloat = 100
+    static let coverPixels: CGFloat = 168  // decoded art size; covers grow up to this
     static let corner: CGFloat = 16       // card corner radius
     static let inset: CGFloat = 12        // card padding
     static let glow: Double = 0.5         // glow opacity while playing

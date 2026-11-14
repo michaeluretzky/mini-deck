@@ -8,10 +8,23 @@ import SwiftUI
 final class CardSizing {
     var playerHeight: CGFloat = 132
     var drawerHeight: CGFloat = 1
+    /// Natural heights of the song rows and the playback strip beside the cover.
+    var textHeight: CGFloat = 0
+    var scrubHeight: CGFloat = 0
 
     func reset(compact: Bool) {
-        playerHeight = compact ? 60 : 132
+        playerHeight = compact ? Metrics.compactCover : Metrics.cover
         drawerHeight = 1
+        textHeight = 0
+        scrubHeight = 0
+    }
+
+    /// The square cover spans from the song title down to the playback bar.
+    func coverSide(compact: Bool, spacing: CGFloat) -> CGFloat {
+        let base = compact ? Metrics.compactCover : Metrics.cover
+        guard textHeight > 0 else { return base }
+        let natural = (textHeight + spacing + scrubHeight).rounded()
+        return min(max(natural, compact ? 80 : 110), compact ? 124 : Metrics.coverPixels)
     }
 }
 
