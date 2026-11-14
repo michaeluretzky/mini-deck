@@ -38,6 +38,26 @@ final class MusicLibrary {
         var recentlyPlayed: [Song] = []
         var all: [Song] = []
         var topAlbums: [AlbumTotal] = []
+        var lookup: Lookup?
+    }
+
+    /// Positions in `all` keyed by artist and album, built once per scan so hover never
+    /// normalizes the whole library.
+    struct Lookup: Sendable {
+        var byArtist: [String: [Int]] = [:]
+        var byAlbum: [String: [Int]] = [:]
+
+        nonisolated static func build(_ songs: [Song]) -> Lookup {
+            var out = Lookup()
+            for (i, song) in songs.enumerated() {
+                let artist = TitleTidy.key(song.artist), albumArtist = TitleTidy.key(song.albumArtist)
+                if !artist.isEmpty { out.byArtist[artist, default: []].append(i) }
+                if !albumArtist.isEmpty && albumArtist != artist { out.byArtist[albumArtist, default: []].append(i) }
+                let album = TitleTidy.key(song.album)
+                if !album.isEmpty { out.byAlbum[album, default: []].append(i) }
+            }
+            return out
+        }
     }
 
     nonisolated static let listLength = 50
@@ -51,6 +71,7 @@ final class MusicLibrary {
     private(set) var topAlbums: [AlbumTotal] = []
     /// Every library song, for artist and album history.
     @ObservationIgnored private(set) var all: [Song] = []
+    @ObservationIgnored private var lookup = Lookup()
     private(set) var scanned: Date?
     private(set) var scanning = false
     private(set) var failed = false
@@ -91,6 +112,7 @@ final class MusicLibrary {
         mostPlayed = result.mostPlayed
         recentlyPlayed = result.recentlyPlayed
         all = result.all
+        lookup = result.lookup ?? Lookup.build(result.all)
         topAlbums = result.topAlbums
         scanned = time
     }
@@ -100,16 +122,15 @@ final class MusicLibrary {
     func songs(byArtist name: String) -> [Song] {
         let key = TitleTidy.key(name)
         guard !key.isEmpty else { return [] }
-        return all.filter { TitleTidy.key($0.artist) == key || TitleTidy.key($0.albumArtist) == key }
+        return (lookup.byArtist[key] ?? []).map { all[$0] }
     }
 
     func songs(onAlbum album: String, artists: [String]) -> [Song] {
         let albumKey = TitleTidy.key(album)
         let keys = Set(artists.map(TitleTidy.key).filter { !$0.isEmpty })
         guard !albumKey.isEmpty else { return [] }
-        return all.filter { song in
-            guard TitleTidy.key(song.album) == albumKey else { return false }
-            return keys.isEmpty || keys.contains(TitleTidy.key(song.artist)) || keys.contains(TitleTidy.key(song.albumArtist))
+        return (lookup.byAlbum[albumKey] ?? []).map { all[$0] }.filter { song in
+            keys.isEmpty || keys.contains(TitleTidy.key(song.artist)) || keys.contains(TitleTidy.key(song.albumArtist))
         }
     }
 
@@ -177,6 +198,7 @@ final class MusicLibrary {
             .sorted { $0.lastPlayed! > $1.lastPlayed! }
             .prefix(listLength))
         scan.all = songs
+        scan.lookup = Lookup.build(songs)
         var albums: [String: (album: String, artist: String, plays: Int)] = [:]
         for song in songs where song.plays > 0 && !TitleTidy.key(song.album).isEmpty {
             let owner = song.albumArtist.isEmpty ? song.artist : song.albumArtist

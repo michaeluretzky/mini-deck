@@ -128,11 +128,18 @@ final class Deck {
         if snap.artist != track.artist || snap.albumArtist != track.albumArtist || snap.source != track.source {
             audience = nil
         }
-        if snap != track { track = snap }
+        // Position advances every poll. Keep it out of the observed track so the
+        // card, stats and window size are not rebuilt once per second.
+        if !snap.matchesIgnoringPosition(track) { track = snap }
         let now = Date()
         if now > seekHold {
-            anchorPosition = snap.position
-            anchorDate = now
+            // Re-anchor the clock only when the app reports a real jump or a state change;
+            // small polling drift would otherwise redraw the progress bar for no visible change.
+            if Snapshot.needsReanchor(predicted: elapsed(at: now), reported: snap.position,
+                                  playing: isPlaying, newTrack: newTrack) {
+                anchorPosition = snap.position
+                anchorDate = now
+            }
         }
         if now > volumeHold, volume != Double(snap.volume) { volume = Double(snap.volume) }
         updateCover(snap)
@@ -251,7 +258,7 @@ final class Deck {
         decoding = true
         coverTask = Task { [weak self] in
             defer { self?.decoding = false }
-            let side = Metrics.cover
+            let side = Metrics.coverPixels
             let made = await Task.detached(priority: .userInitiated) { () -> (CGImage, CGImage, Swatch)? in
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil),
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
@@ -275,7 +282,7 @@ final class Deck {
 
     private func rerenderCover() {
         guard let coverSource else { return }
-        cover = CoverArt.render(coverSource, side: Metrics.cover, scale: pixelScale)
+        cover = CoverArt.render(coverSource, side: Metrics.coverPixels, scale: pixelScale)
     }
 
     // MARK: Commands

@@ -19,7 +19,7 @@ final class Pointer {
     @ObservationIgnored private var opener: Task<Void, Never>?
     @ObservationIgnored private var closer: Task<Void, Never>?
 
-    static let openDelay: Duration = .milliseconds(90)
+    static let openDelay: Duration = .milliseconds(50)
     static let exitGrace: Duration = .milliseconds(120)
 
     func register(_ id: String, _ rect: CGRect) {

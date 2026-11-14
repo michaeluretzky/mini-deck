@@ -33,22 +33,41 @@ struct DeckCard: View {
         let sw = deck.swatch
         let hot = pointer.over(Zone.card)
         VStack(alignment: .leading, spacing: prefs.compactView ? 8 : 12) {
-            VStack(spacing: prefs.compactView ? 5 : 8) {
-            HStack(alignment: .top, spacing: prefs.compactView ? 10 : 14) {
-                CoverTile(deck: deck, pointer: pointer, side: prefs.compactView ? 88 : Metrics.cover)
-                Group {
+            // The cover spans the full player height; the playback bar starts at the
+            // same leading edge as the song, artist and album rows.
+            let compact = prefs.compactView
+            let rowGap: CGFloat = compact ? 5 : 8
+            let coverSide = hub.cardSizing.coverSide(compact: compact, spacing: rowGap)
+            HStack(alignment: .top, spacing: compact ? 10 : 14) {
+                CoverTile(deck: deck, pointer: pointer, side: coverSide, compact: compact)
+                VStack(alignment: .leading, spacing: rowGap) {
+                    Group {
+                        if deck.hasTrack {
+                            NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs,
+                                             compact: prefs.compactView)
+                        } else {
+                            IdleColumn(deck: deck)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GeometryReader { g in
+                        Color.clear.onChange(of: g.size.height, initial: true) { _, height in
+                            if abs(hub.cardSizing.textHeight - height) > 0.5 { hub.cardSizing.textHeight = height }
+                        }
+                    })
+                    Spacer(minLength: 0)
                     if deck.hasTrack {
-                        NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs,
-                                         compact: prefs.compactView)
-                    } else {
-                        IdleColumn(deck: deck)
+                        // Start the bar where the song, artist and album text begins (after the icons).
+                        Scrubber(deck: deck, pointer: pointer, scale: compact ? 2.0 / 3.0 : 1)
+                            .padding(.leading, NowPlayingColumn.textInset(compact: compact))
+                            .background(GeometryReader { g in
+                                Color.clear.onChange(of: g.size.height, initial: true) { _, height in
+                                    if abs(hub.cardSizing.scrubHeight - height) > 0.5 { hub.cardSizing.scrubHeight = height }
+                                }
+                            })
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-                if deck.hasTrack {
-                    Scrubber(deck: deck, pointer: pointer, scale: prefs.compactView ? 2.0 / 3.0 : 1)
-                }
+                .frame(maxWidth: .infinity, minHeight: coverSide, alignment: .topLeading)
             }
             .background(GeometryReader { g in
                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in hub.cardSizing.playerHeight = height }
@@ -93,7 +112,8 @@ struct DeckCard: View {
         .contextMenu { CardMenu(hub: hub, deck: deck, stage: stage, prefs: prefs) }
         .padding(Metrics.halo)
         .background { Halo(swatch: sw, spectrum: spectrum, playing: deck.isPlaying) }
-        .animation(.easeInOut(duration: 0.25), value: deck.track.title)
+        // Size changes are never animated: the window resizes in the same pass, so an
+        // animated card height would briefly clip or leave a gap. Only content fades.
         .animation(.easeInOut(duration: 0.7), value: sw)
         .animation(.easeOut(duration: 0.15), value: deck.hud)
         .animation(nil, value: pointer.drawerOpen)
@@ -104,6 +124,7 @@ struct CoverTile: View {
     let deck: Deck
     let pointer: Pointer
     var side: CGFloat = Metrics.cover
+    var compact = false
 
     var body: some View {
         let hot = deck.hasTrack && pointer.over(Zone.cover)
@@ -116,6 +137,7 @@ struct CoverTile: View {
                     .frame(width: side, height: side)
                     .id(deck.track.album)
                     .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: deck.track.album)
             } else {
                 Image(systemName: "opticaldisc")
                     .font(.system(size: 34, weight: .light))
@@ -141,7 +163,7 @@ struct CoverTile: View {
         }
         .shadow(color: deck.swatch.ground.opacity(0.9), radius: 6, y: 3)
         .zone(Zone.cover, pointer)
-        .help(side < Metrics.cover
+        .help(compact
               ? "Hover for brief song and artist details. Double-click to restore the normal player."
               : "Hover for song, artist and listening details. Double-click for the compact player.")
         .animation(.easeOut(duration: 0.15), value: hot)
@@ -155,6 +177,12 @@ struct NowPlayingColumn: View {
     let prefs: Prefs
     var compact = false
     private var scale: CGFloat { compact ? 2.0 / 3.0 : 1 }
+
+    /// Width of a row icon plus its gap, so other rows can line up with the text.
+    static func textInset(compact: Bool) -> CGFloat {
+        let scale: CGFloat = compact ? 2.0 / 3.0 : 1
+        return 16 * scale + 8 * scale
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10 * scale) {
@@ -202,8 +230,10 @@ struct NowPlayingColumn: View {
             .padding(.bottom, 6 * scale)
             .id(deck.track.title + "\n" + deck.track.artist)
             .transition(.opacity)
+            .animation(.easeInOut(duration: 0.25), value: deck.track.title + "\n" + deck.track.artist)
 
-            Transport(deck: deck, pointer: pointer, scale: scale)
+            // Compact controls stay larger than the rest of the compact type for easy clicking.
+            Transport(deck: deck, pointer: pointer, scale: compact ? 0.8 : 1)
                 .frame(maxWidth: .infinity)
                 .zone(Zone.transport, pointer)
 
@@ -370,11 +400,21 @@ enum Clock {
 
     private static func two(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
 
-    static func runtime(_ seconds: Int) -> String {
+    private static let minutes: DateComponentsFormatter = {
         let f = DateComponentsFormatter()
-        f.allowedUnits = seconds >= 3600 ? [.hour, .minute] : [.minute]
+        f.allowedUnits = [.minute]
         f.unitsStyle = .short
-        return f.string(from: TimeInterval(max(60, seconds))) ?? ""
+        return f
+    }()
+    private static let hours: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.allowedUnits = [.hour, .minute]
+        f.unitsStyle = .short
+        return f
+    }()
+
+    static func runtime(_ seconds: Int) -> String {
+        (seconds >= 3600 ? hours : minutes).string(from: TimeInterval(max(60, seconds))) ?? ""
     }
 }
 
@@ -779,9 +819,7 @@ struct ListeningSection: View {
     let deck: Deck
 
     var body: some View {
-        let report = StatsBook.report(track: deck.track, facts: deck.facts, account: hub.account,
-                                      library: hub.library, archive: hub.archive, span: hub.prefs.spotifySpan,
-                                      historical: hub.wrapped.songs)
+        let report = hub.statsMemo.report(hub: hub, track: deck.track, facts: deck.facts)
         VStack(alignment: .leading, spacing: 8) {
             let advanced = hub.prefs.statsAdvanced
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -893,6 +931,36 @@ struct ListeningSection: View {
             Spacer(minLength: 0)
             Button(label) { hub.askToConnectSpotify() }.controlSize(.small)
         }
+    }
+}
+
+/// Reuses the last report until the song or the underlying history changes, so hover,
+/// resizing and redraws never repeat the matching work.
+@MainActor
+final class StatsMemo {
+    private var key = ""
+    private var cached = ListeningReport()
+
+    func report(hub: Hub, track: Snapshot, facts: LibraryFacts?) -> ListeningReport {
+        // Reading these values also keeps SwiftUI observing every input.
+        let archive = hub.archive.snapshot, account = hub.account, library = hub.library
+        let parts: [String] = [
+            track.source.rawValue, track.trackID, track.title, track.artist, track.albumArtist, track.album,
+            String(describing: facts), String(describing: account.status),
+            account.updated.map { "\($0.timeIntervalSinceReferenceDate)" } ?? "-",
+            "\(account.recent.count)", hub.prefs.spotifySpan.rawValue,
+            "\(archive.events.count)", archive.last.map { "\($0.timeIntervalSinceReferenceDate)" } ?? "-",
+            hub.archive.coverage, "\(hub.wrapped.songs.count)",
+            library.scanned.map { "\($0.timeIntervalSinceReferenceDate)" } ?? "-", "\(library.scanning)",
+            // Relative wording such as "5 min ago" refreshes once a minute.
+            "\(Int(Date().timeIntervalSinceReferenceDate / 60))",
+        ]
+        let next = parts.joined(separator: "\u{1F}")
+        if next == key { return cached }
+        key = next
+        cached = StatsBook.report(track: track, facts: facts, account: account, library: library,
+                                  archive: hub.archive, span: hub.prefs.spotifySpan, historical: hub.wrapped.songs)
+        return cached
     }
 }
 
