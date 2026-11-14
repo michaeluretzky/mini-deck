@@ -109,6 +109,12 @@ final class Hub {
 
     // MARK: Menu actions
 
+    func setCompact(_ compact: Bool) {
+        guard prefs.compactView != compact else { return }
+        pointer.resetLayout()
+        prefs.compactView = compact
+    }
+
     func showHistory(source: HistorySource? = nil) {
         historyWindow.show(hub: self, preferredSource: source)
     }
@@ -246,6 +252,7 @@ final class Hub {
 }
 
 enum PrefKey {
+    static let compactView = "minideck.compactView"
     static let soundBars = "minideck.soundBars"
     static let loginSeeded = "minideck.loginSeeded"
     static let askedCapture = "minideck.askedCapture"
@@ -259,6 +266,9 @@ enum PrefKey {
 
 @MainActor @Observable
 final class Prefs {
+    var compactView: Bool {
+        didSet { UserDefaults.standard.set(compactView, forKey: PrefKey.compactView) }
+    }
     var soundBars: Bool {
         didSet { UserDefaults.standard.set(soundBars, forKey: PrefKey.soundBars) }
     }
@@ -281,6 +291,7 @@ final class Prefs {
 
     init() {
         let store = UserDefaults.standard
+        compactView = store.bool(forKey: PrefKey.compactView)
         soundBars = store.object(forKey: PrefKey.soundBars) as? Bool ?? Metrics.soundBarsOn
         choice = store.string(forKey: PrefKey.choice).flatMap(SourceChoice.init(rawValue:)) ?? .automatic
         countPlays = store.object(forKey: PrefKey.countPlays) as? Bool ?? true
@@ -361,6 +372,8 @@ struct StatusMenu: View {
             Button("Clear Listening History…") { hub.confirmClearHistory() }
                 .disabled(hub.log.isEmpty)
         }
+        Toggle("Compact View", isOn: Binding(get: { hub.prefs.compactView },
+                                             set: { hub.setCompact($0) }))
         Toggle("Sound Bars", isOn: Binding(get: { hub.prefs.soundBars },
                                            set: { hub.prefs.soundBars = $0 }))
         Toggle("Open at Login", isOn: Binding(get: { hub.prefs.openAtLogin },

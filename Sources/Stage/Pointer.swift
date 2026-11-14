@@ -30,6 +30,19 @@ final class Pointer {
 
     func over(_ id: String) -> Bool { hovered.contains(id) }
 
+    /// Discard stale normal/compact hit regions and pending hover work on resize.
+    func resetLayout() {
+        opener?.cancel()
+        closer?.cancel()
+        opener = nil
+        closer = nil
+        zones.removeAll()
+        hovered = []
+        drawerOpen = false
+        scrub = nil
+        location = nil
+    }
+
     private func evaluate() {
         let next: Set<String>
         if !frozen, let point = location {

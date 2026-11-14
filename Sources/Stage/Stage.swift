@@ -7,6 +7,7 @@ import SwiftUI
 enum Metrics {
     // Design settings
     static let card: CGFloat = 448        // card width
+    static let compactCard: CGFloat = 300
     static let cover: CGFloat = 132       // album art side
     static let corner: CGFloat = 16       // card corner radius
     static let inset: CGFloat = 12        // card padding
@@ -76,7 +77,7 @@ final class Stage {
     private(set) var isShown = false
     @ObservationIgnored private var panel: DeckPanel?
     @ObservationIgnored private var grab: (mouse: NSPoint, origin: NSPoint)?
-    @ObservationIgnored private var pendingFit: (height: CGFloat, growDown: Bool)?
+    @ObservationIgnored private var pendingFit: (height: CGFloat, width: CGFloat, growDown: Bool)?
     @ObservationIgnored private var fitScheduled = false
     @ObservationIgnored var onScaleChange: ((CGFloat) -> Void)?
 
@@ -242,8 +243,8 @@ final class Stage {
 
     /// Grows or shrinks to the content. The top edge stays put unless the card sits on the bottom edge.
     /// Coalesce layout measurements rather than queueing stale window sizes.
-    func scheduleFit(height: CGFloat, growDown: Bool) {
-        pendingFit = (height, growDown)
+    func scheduleFit(height: CGFloat, width: CGFloat, growDown: Bool) {
+        pendingFit = (height, width, growDown)
         guard !fitScheduled else { return }
         fitScheduled = true
         DispatchQueue.main.async { [weak self] in
@@ -251,18 +252,20 @@ final class Stage {
             self.fitScheduled = false
             guard let next = self.pendingFit else { return }
             self.pendingFit = nil
-            self.fit(height: next.height, growDown: next.growDown)
+            self.fit(height: next.height, width: next.width, growDown: next.growDown)
         }
     }
 
-    func fit(height: CGFloat, growDown: Bool) {
-        guard let panel, height > 30 else { return }
+    func fit(height: CGFloat, width: CGFloat, growDown: Bool) {
+        guard let panel, height > 30, width > 100 else { return }
         let height = ceil(height * scale) / scale
         let f = panel.frame
-        guard abs(f.height - height) > 0.5 || f.width != Metrics.panelWidth else { return }
+        guard abs(f.height - height) > 0.5 || f.width != width else { return }
         let onBottom = playArea(for: f).map { abs(f.minY - $0.minY) < 2 } ?? false
-        var next = NSRect(x: f.minX, y: (onBottom && !growDown) ? f.minY : f.maxY - height,
-                          width: Metrics.panelWidth, height: height)
+        let onRight = playArea(for: f).map { abs(f.maxX - $0.maxX) < 2 } ?? false
+        var next = NSRect(x: onRight ? f.maxX - width : f.minX,
+                          y: (onBottom && !growDown) ? f.minY : f.maxY - height,
+                          width: width, height: height)
         next.origin = magnetize(next, clamp: true)
         // Content expansion must not start an AppKit animation for every
         // SwiftUI size measurement. Keep gliding only for explicit moves.

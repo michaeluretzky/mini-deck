@@ -12,6 +12,8 @@ Mini Deck is a floating music controller for macOS. It works with Spotify and Ap
 4. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway** next to Mini Deck. Confirm with your password.
 5. Mini Deck appears in the menu bar and as a floating card. Allow access to Spotify or Music when asked.
 
+Double-click the widget to switch between normal and compact views. Compact view keeps the cover, song, artist and basic playback controls; hovering over its cover shows brief song and artist details only. Double-click again for the full player and listening statistics. **Compact View** is also available in the right-click and menu-bar menus.
+
 If you're comfortable with Terminal, this also clears the block:
 
 ```sh

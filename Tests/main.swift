@@ -345,6 +345,17 @@ func checkPointer() async {
     pointer.location = nil
     try? await Task.sleep(for: .milliseconds(180))
     expect(!pointer.drawerOpen, "real pointer exit closes after grace period")
+    pointer.location = CGPoint(x: 20, y: 20)
+    pointer.scrub = 0.5
+    pointer.resetLayout()
+    try? await Task.sleep(for: .milliseconds(150))
+    expect(pointer.zones.isEmpty && pointer.hovered.isEmpty, "mode change clears stale hover regions")
+    expect(!pointer.drawerOpen && pointer.scrub == nil, "mode change cancels pending drawer and scrub")
+    pointer.register(Zone.card, CGRect(x: 0, y: 0, width: 300, height: 250))
+    pointer.register(Zone.cover, CGRect(x: 10, y: 10, width: 60, height: 60))
+    pointer.location = CGPoint(x: 25, y: 25)
+    try? await Task.sleep(for: .milliseconds(160))
+    expect(pointer.drawerOpen, "compact cover opens its hover panel after a layout reset")
 }
 
 @MainActor

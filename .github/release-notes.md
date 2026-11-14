@@ -4,6 +4,8 @@ Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotif
 
 The Spotify or Apple Music service icon now sits at the top-right of the player in a compact 22-point badge. It remains clickable, without a visible “Open…” caption. Removing the old attribution footer reduces the card's bottom space while preserving the track/control spacing.
 
+Double-click the player to toggle a smaller 300-point-wide compact view, then double-click again to restore the normal 448-point player. Compact mode keeps basic playback controls and a cover-hover panel limited to brief song and artist details. The mode is remembered and is also available through the **Compact View** menu option. Listening statistics remain in normal view and Listening History.
+
 Drawer responsiveness: reduces the intentional cover-hover delay from 280 to 90 milliseconds, removes competing content/window resize animations, coalesces size updates, and avoids full-card hover invalidations for every mouse movement. A short exit grace period prevents transient resize events from immediately collapsing the drawer. These are implementation changes, not a measured end-to-end latency guarantee.
 
 **Integrated history:** song details show known historical years, including when a song is absent from current API results. **Listening History > Spotify > History** combines recent account records, imported streaming history and historical song records, deduplicating exact song IDs. Year-only data never becomes play counts, listening minutes, synthetic playback dates or rankings. Public downloads contain no personal data; existing Mini Deck historical-song snapshots remain compatible.

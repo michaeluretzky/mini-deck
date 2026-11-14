@@ -9,10 +9,11 @@ struct DeckRoot: View {
 
     var body: some View {
         DeckCard(hub: hub, deck: hub.deck, pointer: hub.pointer, spectrum: hub.spectrum, stage: hub.stage, prefs: hub.prefs)
-            .fixedSize(horizontal: false, vertical: true)
+            .id(hub.prefs.compactView)
+            .fixedSize(horizontal: true, vertical: true)
             .background(GeometryReader { g in
-                Color.clear.onChange(of: g.size.height, initial: true) { _, height in
-                    hub.stage.scheduleFit(height: height, growDown: hub.pointer.drawerOpen)
+                Color.clear.onChange(of: g.size, initial: true) { _, size in
+                    hub.stage.scheduleFit(height: size.height, width: size.width, growDown: hub.pointer.drawerOpen)
                 }
             })
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -31,12 +32,16 @@ struct DeckCard: View {
     var body: some View {
         let sw = deck.swatch
         let hot = pointer.over(Zone.card)
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 14) {
-                CoverTile(deck: deck, pointer: pointer)
+        VStack(alignment: .leading, spacing: prefs.compactView ? 8 : 12) {
+            HStack(alignment: .top, spacing: prefs.compactView ? 10 : 14) {
+                CoverTile(deck: deck, pointer: pointer, side: prefs.compactView ? 60 : Metrics.cover)
                 Group {
                     if deck.hasTrack {
-                        NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs)
+                        if prefs.compactView {
+                            CompactPlayingColumn(deck: deck, pointer: pointer)
+                        } else {
+                            NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs)
+                        }
                     } else {
                         IdleColumn(deck: deck)
                     }
@@ -47,12 +52,17 @@ struct DeckCard: View {
                 Capsule()
                     .fill(LinearGradient(colors: [sw.lead.opacity(0.45), sw.echo.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 1)
-                InfoDrawer(hub: hub, deck: deck)
-                    .transition(.identity)
+                Group {
+                    if prefs.compactView {
+                        CompactInfoDrawer(deck: deck, account: hub.account)
+                    } else {
+                        InfoDrawer(hub: hub, deck: deck)
+                    }
+                }.transition(.identity)
             }
         }
-        .padding(Metrics.inset)
-        .frame(width: Metrics.card, alignment: .topLeading)
+        .padding(prefs.compactView ? 10 : Metrics.inset)
+        .frame(width: prefs.compactView ? Metrics.compactCard : Metrics.card, alignment: .topLeading)
         .background { Backdrop(swatch: sw) }
         .overlay(alignment: .topTrailing) { HUDBadge(message: deck.hud, swatch: sw) }
         .clipShape(.rect(cornerRadius: Metrics.corner, style: .continuous))
@@ -64,6 +74,10 @@ struct DeckCard: View {
         .environment(\.colorScheme, .dark)
         .contentShape(.rect)
         .zone(Zone.card, pointer)
+        .onTapGesture(count: 2) { hub.setCompact(!prefs.compactView) }
+        .accessibilityAction(named: Text(prefs.compactView ? "Expand player" : "Compact player")) {
+            hub.setCompact(!prefs.compactView)
+        }
         .gesture(DragGesture(minimumDistance: 3)
             .onChanged { _ in pointer.frozen = true; stage.dragMoved() }
             .onEnded { _ in stage.dragEnded(); pointer.frozen = false })
@@ -80,16 +94,17 @@ struct DeckCard: View {
 struct CoverTile: View {
     let deck: Deck
     let pointer: Pointer
+    var side: CGFloat = Metrics.cover
 
     var body: some View {
         let hot = deck.hasTrack && pointer.over(Zone.cover)
         ZStack(alignment: .bottomTrailing) {
             RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(0.08))
             if deck.hasTrack, let image = deck.cover {
-                // already sized to this screen's pixels, so draw 1:1
+                // The full-size cover also supplies enough pixels for compact mode.
                 Image(nsImage: image)
-                    .interpolation(.none)
-                    .frame(width: Metrics.cover, height: Metrics.cover)
+                    .resizable().interpolation(.high).scaledToFill()
+                    .frame(width: side, height: side)
                     .id(deck.track.album)
                     .transition(.opacity)
             } else {
@@ -109,7 +124,7 @@ struct CoverTile: View {
                     .opacity(hot ? 1 : 0)
             }
         }
-        .frame(width: Metrics.cover, height: Metrics.cover)
+        .frame(width: side, height: side)
         .clipShape(.rect(cornerRadius: deck.source == .spotify ? 0 : 9, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -117,8 +132,9 @@ struct CoverTile: View {
         }
         .shadow(color: deck.swatch.ground.opacity(0.9), radius: 6, y: 3)
         .zone(Zone.cover, pointer)
-        .onTapGesture(count: 2) { deck.revealApp() }
-        .help("Rest the pointer here for the song, the artist and your listening stats. Double-click to open \(deck.source.appName).")
+        .help(side < Metrics.cover
+              ? "Hover for brief song and artist details. Double-click to restore the normal player."
+              : "Hover for song, artist and listening details. Double-click for the compact player.")
         .animation(.easeOut(duration: 0.15), value: hot)
     }
 }
@@ -1017,6 +1033,7 @@ struct CardMenu: View {
                 Button("Copy Track Link", action: deck.copyLink).disabled(deck.shareURL == nil)
             }
         }
+        Toggle("Compact View", isOn: Binding(get: { prefs.compactView }, set: { hub.setCompact($0) }))
         Toggle("Sound Bars", isOn: Binding(get: { prefs.soundBars }, set: { prefs.soundBars = $0 }))
         Button(deck.appOpen ? "Show \(deck.source.appName)" : "Open \(deck.source.appName)") { deck.revealApp() }
         if deck.source == .spotify && !hub.account.isConnected && hub.account.status != .waiting {
