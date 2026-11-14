@@ -234,6 +234,9 @@ await MainActor.run {
         expect(indexed.songsByArtist[TitleTidy.key(event.artist)]?.count == 2, "artist song list groups aliases but preserves remix")
         let details = StatsBook.importedReport(track: remoteTrack, snapshot: indexed, coverage: "test")
         expect(details.song.tiles.first?.value == "2", "current song includes its alternate Spotify IDs")
+        expect(details.song.tiles.first?.supplement == "/ 2 total songs", "song suffix counts unique displayed songs")
+        expect(details.artist.tiles.first?.supplement == "/ 1 total artists", "artist suffix uses all saved artists")
+        expect(details.album.tiles.first?.supplement == "/ 1 total albums", "album suffix uses all saved albums")
         expect(details.album.tiles.contains { $0.caption == "songs in saved history" && $0.value == "2" },
                "album unique-song count uses grouped titles")
         expect(AccountHistory.songs(recent: [], historical: [], imported: indexed.songs).count == 2,
@@ -289,6 +292,15 @@ await MainActor.run {
     current.source = .music
     _ = onlyMusic.observe(current, now: baseTime)
     expect(onlyMusic.records.isEmpty, "Apple Music never enters Spotify totals")
+    var relinked = SpotifyJournal()
+    current.source = .spotify
+    current.position = 0
+    _ = relinked.observe(current, now: baseTime)
+    let aliasPlay = SpotifyAccount.Play(trackID: "relinked", artistKeys: [], at: baseTime,
+        title: current.title, artist: current.primaryArtist, album: current.album)
+    relinked.ingest([aliasPlay], now: baseTime)
+    expect(relinked.additions(after: nil).count == 1, "relinked Spotify ID does not double-count an overlapping local session")
+    current.source = .music
     let brief = ListeningLog(persist: false)
     brief.tick(current, now: baseTime)
     expect(brief.song(artist: current.primaryArtist, title: current.title)?.plays == 1, "Mac totals also count brief playback immediately")

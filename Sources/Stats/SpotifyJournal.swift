@@ -90,10 +90,11 @@ struct SpotifyJournal: Codable, Sendable {
         for play in remote {
             let match = local.filter { record in
                 guard !matched.contains(record.id) else { return false }
-                let same = !record.uri.isEmpty && !play.uri.isEmpty
-                    ? record.uri == play.uri
-                    : SpotifyArchive.nameKey(record.title) == SpotifyArchive.nameKey(play.title)
-                        && SpotifyArchive.nameKey(record.artist) == SpotifyArchive.nameKey(play.artist)
+                let sameID = !record.uri.isEmpty && record.uri == play.uri
+                let sameRelease = !record.album.isEmpty && !play.album.isEmpty
+                    && SpotifyArchive.displaySongKey(title: record.title, artist: record.artist, album: record.album)
+                        == SpotifyArchive.displaySongKey(title: play.title, artist: play.artist, album: play.album)
+                let same = sameID || sameRelease
                 // Account timestamps can land at the start or end of a session.
                 // Include the already-playing portion seen on first observation.
                 let inferredStart = record.ended.addingTimeInterval(-max(0, record.position))

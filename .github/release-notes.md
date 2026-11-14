@@ -10,6 +10,8 @@ Repeated Spotify IDs with identical title, artist and album metadata now share o
 
 The outer glow now uses a rounded falloff that reaches transparent pixels before the window edge, removing the rectangular blur cutoff.
 
+Song, artist and album play tiles retain their large play count and add a smaller `/ N total songs`, `/ N total artists`, or `/ N total albums` suffix. These are unique saved-history collection sizes, not play-count denominators; both summary and advanced tiles use the same caption-size styling.
+
 Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotify dates and Apple/MusicBrainz album-note fallbacks share the same format. Dates with only month or year precision remain **September 2020** or **2020**, without invented dates or timezone shifts. Artist birth and formation years are unchanged. Existing private listening data is preserved.
 
 The Spotify or Apple Music service icon now sits at the top-right of the player in a compact 22-point badge. It remains clickable, without a visible “Open…” caption. Removing the old attribution footer reduces the card's bottom space while preserving the track/control spacing.

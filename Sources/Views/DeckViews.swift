@@ -939,7 +939,7 @@ struct SummaryRow: View {
                     Text(label.uppercased())
                         .font(.system(size: 8.5, weight: .semibold))
                         .foregroundStyle(.tertiary)
-                    HStack(spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         if let symbol = tile.symbol {
                             Image(systemName: symbol).font(.system(size: 9, weight: .semibold)).foregroundStyle(tint)
                         }
@@ -947,6 +947,14 @@ struct SummaryRow: View {
                             .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
+                            .layoutPriority(1)
+                        if let supplement = tile.supplement {
+                            Text(supplement)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Text(tile.caption)
                         .font(.system(size: 9))
@@ -958,7 +966,7 @@ struct SummaryRow: View {
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
-                .help(tile.value + " " + tile.caption)
+                .help(tile.value + " " + tile.caption + (tile.supplement.map { " · \($0) in saved history" } ?? ""))
             }
         }
     }
@@ -1016,7 +1024,7 @@ struct StatCell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 if let symbol = tile.symbol {
                     Image(systemName: symbol).font(.system(size: 9, weight: .semibold)).foregroundStyle(tint)
                 }
@@ -1024,6 +1032,14 @@ struct StatCell: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+                if let supplement = tile.supplement {
+                    Text(supplement)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Text(tile.caption)
                 .font(.system(size: 9.5))
@@ -1035,7 +1051,7 @@ struct StatCell: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
-        .help(tile.value + " " + tile.caption)
+        .help(tile.value + " " + tile.caption + (tile.supplement.map { " · \($0) in saved history" } ?? ""))
     }
 }
 
