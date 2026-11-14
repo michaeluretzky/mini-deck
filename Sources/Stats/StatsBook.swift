@@ -8,6 +8,12 @@ struct StatTile: Hashable, Identifiable {
     let caption: String
     var symbol: String?
     var supplement: String? = nil
+
+    /// Hover text written as one plain sentence.
+    var helpText: String {
+        guard let supplement else { return value + " " + caption }
+        return "\(value) \(supplement) · \(caption) in your saved history"
+    }
     var id: String { caption + value }
 }
 
@@ -139,6 +145,11 @@ enum StatsBook {
         out.album.add(tiles(albumSongs), from: source)
     }
 
+    /// Caption under a play count: how many different items the whole history holds.
+    static func heardCaption(_ total: Int, _ noun: String) -> String {
+        "\(total.formatted()) \(noun)\(total == 1 ? "" : "s") heard"
+    }
+
     static func importedReport(track: Snapshot, snapshot: SpotifyArchive.Snapshot, coverage: String) -> ListeningReport {
         var out = ListeningReport()
         let keys = Set([track.primaryArtist, track.albumArtist]
@@ -153,27 +164,27 @@ enum StatsBook {
         }
         let album = songs.filter { !track.album.isEmpty && SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album) }
         let source = "Spotify history · all devices + this Mac · \(coverage)"
-        func tiles(_ rows: [SpotifyArchive.Total], total: Int) -> [StatTile] {
+        func tiles(_ rows: [SpotifyArchive.Total], total: Int, noun: String) -> [StatTile] {
             guard !rows.isEmpty else { return [] }
             let plays = rows.reduce(0) { $0 + $1.plays }
             let seconds = rows.reduce(0.0) { $0 + $1.seconds }
             let time = seconds < 60 ? "\(Int(seconds)) sec" : duration(seconds)
-            return [StatTile(value: "\(plays)", caption: "overall plays", symbol: "play.circle",
-                             supplement: "/ \(total.formatted())"),
+            return [StatTile(value: "\(plays)", caption: heardCaption(total, noun), symbol: "play.circle",
+                             supplement: plays == 1 ? "play" : "plays"),
                     StatTile(value: time, caption: "known listening time", symbol: "clock")]
         }
-        var songTiles = tiles(Array(matching), total: snapshot.songTotals.count)
+        var songTiles = tiles(Array(matching), total: snapshot.songTotals.count, noun: "song")
         if let last = matching.map(\.last).max() {
             songTiles.append(StatTile(value: ago(last), caption: "last recorded play", symbol: "calendar"))
         }
         out.song.add(songTiles, from: source)
         let artists = keys.compactMap { snapshot.artists[$0] }
-        var artistTiles = tiles(artists, total: snapshot.artists.count)
+        var artistTiles = tiles(artists, total: snapshot.artists.count, noun: "artist")
         if let rank = keys.compactMap({ snapshot.artistRanks[$0] }).min() {
             artistTiles.append(StatTile(value: "#\(rank)", caption: "artist in saved history", symbol: "list.number"))
         }
         out.artist.add(artistTiles, from: source)
-        var albumTiles = tiles(Array(album), total: snapshot.albums.count)
+        var albumTiles = tiles(Array(album), total: snapshot.albums.count, noun: "album")
         if !album.isEmpty {
             albumTiles.append(StatTile(value: "\(album.count)", caption: "songs in saved history", symbol: "music.note.list"))
         }

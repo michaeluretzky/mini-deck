@@ -50,6 +50,7 @@ final class Hub {
     let archive = SpotifyArchive()
     let wrapped = WrappedLibrary()
     let statsMemo = StatsMemo()
+    let energy = Energy()
     private let historyWindow = HistoryWindow()
     private let setupWindow = SetupWindow()
     private var started = false
@@ -62,7 +63,7 @@ final class Hub {
         deck.choice = prefs.choice
         deck.onTick = { [weak self] snap in
             guard let self else { return }
-            self.log.tick(snap)
+            self.log.tick(snap, gap: EnergyPolicy.listenGap(forInterval: self.deck.pollSeconds))
             if self.prefs.countPlays { self.archive.observe(snap) }
         }
         account.onRecent = { [weak self] plays, complete in self?.archive.ingestRecent(plays, complete: complete) }
@@ -74,6 +75,11 @@ final class Hub {
         deck.onNewTrack = { [weak self] snap in self?.trackChanged(snap) }
         account.onNotice = { [weak self] text in self?.deck.flash("person.crop.circle.badge.checkmark", text) }
         stage.onScaleChange = { [weak self] scale in self?.deck.pixelScale = scale }
+        deck.energy = energy
+        stage.onVisibility = { [weak self] shown in self?.energy.setVisible(shown) }
+        // Waking, uncovering or leaving Low Power Mode refreshes at once and picks the new pace.
+        energy.onChange = { [weak self] in self?.deck.repace() }
+        energy.start()
         stage.build(DeckRoot(hub: self),
                     scroll: { [weak self] event in self?.scrolled(event) ?? false },
                     pointer: { [weak self] point in self?.pointer.location = point })
@@ -83,7 +89,9 @@ final class Hub {
         accountRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.account.update(trackChanged: true)
+                if EnergyPolicy.refreshesAccount(self.deck.energyContext) {
+                    await self.account.update(trackChanged: true)
+                }
                 try? await Task.sleep(for: .seconds(120))
             }
         }
@@ -115,10 +123,13 @@ final class Hub {
         return true
     }
 
-    /// Re-runs whenever the sound-bar setting, the play state or the followed app changes.
+    /// Re-runs whenever the sound-bar setting, the play state, the followed app,
+    /// visibility, display sleep or Low Power Mode changes.
     private func followPlayback() {
         let wanted = withObservationTracking {
-            (prefs.soundBars, deck.appOpen && deck.isPlaying, deck.source.bundle)
+            (prefs.soundBars,
+             deck.appOpen && deck.isPlaying && EnergyPolicy.animates(deck.energyContext),
+             deck.source.bundle)
         } onChange: { [weak self] in
             Task { @MainActor in self?.followPlayback() }
         }

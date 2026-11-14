@@ -18,6 +18,8 @@ dist/
 *.p12
 *.key
 *.mobileprovision
+*.provisionprofile
+*.pkg
 secrets*
 credentials*
 listening.json
