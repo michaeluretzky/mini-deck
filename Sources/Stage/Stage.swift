@@ -215,9 +215,9 @@ final class Stage {
 
     // MARK: Moving
 
-    func dragMoved() {
+    func dragMoved(to point: NSPoint? = nil) {
         guard let panel else { return }
-        let mouse = NSEvent.mouseLocation
+        let mouse = point ?? NSEvent.mouseLocation
         if grab == nil {
             if drawerExpanded, let restingFrame {
                 let f = panel.frame
@@ -232,7 +232,8 @@ final class Stage {
         var f = panel.frame
         f.origin = NSPoint(x: g.topLeft.x + mouse.x - g.mouse.x,
                            y: g.topLeft.y + mouse.y - g.mouse.y - f.height)
-        f.origin = magnetize(f, clamp: false)
+        // Stop at the screen margin while dragging, not only after release.
+        f.origin = magnetize(f, clamp: true)
         apply(f)
     }
 

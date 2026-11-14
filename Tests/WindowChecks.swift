@@ -77,6 +77,22 @@ struct WindowChecks {
                 expect(area.contains(window.frame), "\(corner): size switch during drag stays on screen")
             }
         }
+        // Dragging past any edge must stop at the margin, both during and after the drag.
+        for size in [(218.0, 488.0), (163.0, 340.0)] {
+            stage.fit(height: size.0, width: size.1, growDown: false)
+            for push in [CGPoint(x: 3000, y: 0), CGPoint(x: -3000, y: 0), CGPoint(x: 0, y: 3000),
+                         CGPoint(x: 0, y: -3000), CGPoint(x: 3000, y: 3000), CGPoint(x: -3000, y: -3000)] {
+                stage.park(at: .top)
+                let start = NSPoint(x: window.frame.midX, y: window.frame.midY)
+                stage.dragMoved(to: start)
+                stage.dragMoved(to: NSPoint(x: start.x + push.x / 2, y: start.y + push.y / 2))
+                expect(area.contains(window.frame), "drag \(push) width \(size.1): stays on screen mid-drag")
+                stage.dragMoved(to: NSPoint(x: start.x + push.x, y: start.y + push.y))
+                expect(area.contains(window.frame), "drag \(push) width \(size.1): stays on screen at the edge")
+                stage.dragEnded()
+                expect(area.contains(window.frame), "drag \(push) width \(size.1): stays on screen after release")
+            }
+        }
         stage.fit(height: 218, width: 488, growDown: false)
         stage.park(at: .topTrailing)
 
