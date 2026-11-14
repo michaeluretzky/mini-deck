@@ -44,6 +44,7 @@ final class SpotifyArchive {
     struct Snapshot: Sendable {
         var events: [Event] = []
         var songs: [String: Total] = [:]
+        var songTotals: [String: Total] = [:]
         var artists: [String: Total] = [:]
         var albums: [String: Total] = [:]
         var songsByArtist: [String: [Total]] = [:]
@@ -333,6 +334,10 @@ final class SpotifyArchive {
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     }
 
+    nonisolated static func displaySongKey(title: String, artist: String, album: String) -> String {
+        [artist, title, album].map(nameKey).joined(separator: "\u{1F}")
+    }
+
     nonisolated static func parse(_ data: Data) throws -> Parsed {
         guard data.count <= 64_000_000 else { throw ImportError.tooLarge }
         guard let rows = try? JSONDecoder().decode([Raw].self, from: data),
@@ -385,8 +390,21 @@ final class SpotifyArchive {
     nonisolated private static func finishIndexes(_ snapshot: inout Snapshot) {
         snapshot.songsByArtist = [:]
         snapshot.artistRanks = [:]
-        // Build lookup/ranking indexes on the worker, never on hover.
+        snapshot.songTotals = [:]
+        // Different Spotify IDs can represent the same displayed release.
+        // Keep original URI records, but combine exact title/artist/album matches.
         for song in snapshot.songs.values {
+            let key = displaySongKey(title: song.title, artist: song.artist, album: song.album)
+            if var total = snapshot.songTotals[key] {
+                total.plays += song.plays
+                total.milliseconds += song.milliseconds
+                total.first = min(total.first, song.first)
+                total.last = max(total.last, song.last)
+                snapshot.songTotals[key] = total
+            } else { snapshot.songTotals[key] = song }
+        }
+        // Build lookup/ranking indexes on the worker, never on hover.
+        for song in snapshot.songTotals.values {
             snapshot.songsByArtist[TitleTidy.key(song.artist), default: []].append(song)
         }
         let rankedArtists = snapshot.artists.sorted {
@@ -400,7 +418,7 @@ final class SpotifyArchive {
                 return $0.title < $1.title
             }.prefix(100))
         }
-        snapshot.topSongs = ranked(Array(snapshot.songs.values))
+        snapshot.topSongs = ranked(Array(snapshot.songTotals.values))
         snapshot.topArtists = ranked(Array(snapshot.artists.values))
         snapshot.topAlbums = ranked(Array(snapshot.albums.values))
     }

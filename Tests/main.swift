@@ -222,6 +222,23 @@ await MainActor.run {
     expect((try? SpotifyArchive.parse(Data(#"[{"endTime":"2020-01-01 12:00","msPlayed":100}]"#.utf8))) == nil,
            "standard account export not mislabeled lifetime history")
     expect((try? SpotifyArchive.parse(Data("not json".utf8))) == nil, "malformed export rejected")
+    if let event = parsed?.events.first {
+        let alternate = SpotifyArchive.Event(ended: event.ended.addingTimeInterval(100), milliseconds: 1000,
+            title: event.title, artist: event.artist, album: event.album, uri: "spotify:track:alternate")
+        let remix = SpotifyArchive.Event(ended: event.ended.addingTimeInterval(200), milliseconds: 2000,
+            title: event.title + " (Remix)", artist: event.artist, album: event.album, uri: "spotify:track:remix")
+        let indexed = SpotifyArchive.index([event, alternate, remix])
+        expect(indexed.events.count == 3 && indexed.songs.count == 3, "display grouping preserves original events and IDs")
+        expect(indexed.songTotals.count == 2, "identical metadata across Spotify IDs shares one displayed song")
+        expect(indexed.topSongs.first?.plays == 2, "grouped row sums all legitimate plays")
+        expect(indexed.songsByArtist[TitleTidy.key(event.artist)]?.count == 2, "artist song list groups aliases but preserves remix")
+        let details = StatsBook.importedReport(track: remoteTrack, snapshot: indexed, coverage: "test")
+        expect(details.song.tiles.first?.value == "2", "current song includes its alternate Spotify IDs")
+        expect(details.album.tiles.contains { $0.caption == "songs in saved history" && $0.value == "2" },
+               "album unique-song count uses grouped titles")
+        expect(AccountHistory.songs(recent: [], historical: [], imported: indexed.songs).count == 2,
+               "normal account history also consolidates alternate IDs")
+    }
 
     // MARK: Forward collection and cross-source reconciliation
     let baseTime = Date(timeIntervalSince1970: 1_700_000_000)

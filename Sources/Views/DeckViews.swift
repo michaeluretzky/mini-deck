@@ -34,14 +34,11 @@ struct DeckCard: View {
         let hot = pointer.over(Zone.card)
         VStack(alignment: .leading, spacing: prefs.compactView ? 8 : 12) {
             HStack(alignment: .top, spacing: prefs.compactView ? 10 : 14) {
-                CoverTile(deck: deck, pointer: pointer, side: prefs.compactView ? 60 : Metrics.cover)
+                CoverTile(deck: deck, pointer: pointer, side: prefs.compactView ? 88 : Metrics.cover)
                 Group {
                     if deck.hasTrack {
-                        if prefs.compactView {
-                            CompactPlayingColumn(deck: deck, pointer: pointer)
-                        } else {
-                            NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs)
-                        }
+                        NowPlayingColumn(deck: deck, pointer: pointer, spectrum: spectrum, prefs: prefs,
+                                         compact: prefs.compactView)
                     } else {
                         IdleColumn(deck: deck)
                     }
@@ -51,15 +48,12 @@ struct DeckCard: View {
             .background(GeometryReader { g in
                 Color.clear.onChange(of: g.size.height, initial: true) { _, height in hub.cardSizing.playerHeight = height }
             })
-            if prefs.compactView && deck.hasTrack {
-                CompactProgress(deck: deck)
-            }
             if pointer.drawerOpen && deck.hasTrack {
                 Capsule()
                     .fill(LinearGradient(colors: [sw.lead.opacity(0.45), sw.echo.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 1)
                 BoundedDrawer(limit: max(60, stage.maxPanelHeight - hub.cardSizing.playerHeight - 2 * Metrics.halo
-                                         - (prefs.compactView ? 48 : 49)), sizing: hub.cardSizing) {
+                                         - (prefs.compactView ? 37 : 49)), sizing: hub.cardSizing) {
                     if prefs.compactView {
                         CompactInfoDrawer(deck: deck, account: hub.account)
                     } else {
@@ -154,55 +148,59 @@ struct NowPlayingColumn: View {
     let pointer: Pointer
     let spectrum: Spectrum
     let prefs: Prefs
+    var compact = false
+    private var scale: CGFloat { compact ? 2.0 / 3.0 : 1 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .top, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10 * scale) {
+            VStack(alignment: .leading, spacing: 6 * scale) {
+                HStack(alignment: .top, spacing: 8 * scale) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8 * scale) {
                     Image(systemName: "music.note")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13 * scale, weight: .semibold))
                         .foregroundStyle(deck.swatch.lead)
-                        .frame(width: 16)
+                        .frame(width: 16 * scale)
                         .accessibilityHidden(true)
                     Text(deck.track.title)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 15 * scale, weight: .bold))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if prefs.soundBars {
                         SoundBars(spectrum: spectrum, playing: deck.isPlaying, tint: deck.swatch.lead)
+                            .scaleEffect(scale, anchor: .trailing)
+                            .frame(width: 21 * scale)
                             .accessibilityHidden(true)
                     }
                     }
-                    ServiceBadge(deck: deck)
+                    ServiceBadge(deck: deck, size: max(16, 22 * scale))
                 }
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "person.fill").frame(width: 16).accessibilityHidden(true)
+                HStack(alignment: .firstTextBaseline, spacing: 8 * scale) {
+                    Image(systemName: "person.fill").frame(width: 16 * scale).accessibilityHidden(true)
                     Text(deck.track.artist)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: 12.5, weight: .medium)).foregroundStyle(.secondary)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "opticaldisc").frame(width: 16).accessibilityHidden(true)
+                .font(.system(size: 12.5 * scale, weight: .medium)).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8 * scale) {
+                    Image(systemName: "opticaldisc").frame(width: 16 * scale).accessibilityHidden(true)
                     Text(deck.track.album)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                .font(.system(size: 11.5 * scale)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 6)
+            .padding(.bottom, 6 * scale)
             .id(deck.track.title + "\n" + deck.track.artist)
             .transition(.opacity)
 
-            Transport(deck: deck, pointer: pointer)
+            Transport(deck: deck, pointer: pointer, scale: scale)
                 .frame(maxWidth: .infinity)
                 .zone(Zone.transport, pointer)
 
-            Scrubber(deck: deck, pointer: pointer)
-                .padding(.top, 4)
+            Scrubber(deck: deck, pointer: pointer, scale: scale)
+                .padding(.top, 4 * scale)
         }
     }
 }
@@ -210,6 +208,7 @@ struct NowPlayingColumn: View {
 /// Compact, clickable service identity; no footer row or visible action caption.
 struct ServiceBadge: View {
     let deck: Deck
+    var size: CGFloat = 22
     private static let musicIcon = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Source.music.bundle)
         .map { NSWorkspace.shared.icon(forFile: $0.path) }
 
@@ -231,7 +230,7 @@ struct ServiceBadge: View {
                     Image(systemName: "music.note").resizable().scaledToFit()
                 }
             }
-            .frame(width: 22, height: 22)
+            .frame(width: size, height: size)
             .padding(.horizontal, 3)
             .contentShape(.rect)
         }
@@ -289,16 +288,17 @@ struct Pad: View {
     let tint: Color
     let pointer: Pointer
     let act: () -> Void
+    var scale: CGFloat = 1
 
     var body: some View {
         let id = "pad." + symbol
         let hot = pointer.over(id)
         Button(action: act) {
             Image(systemName: symbol)
-                .font(.system(size: size, weight: .semibold))
+                .font(.system(size: size * scale, weight: .semibold))
                 .foregroundStyle(lit == true ? tint : Color.primary)
                 .opacity(lit == false ? (hot ? 0.75 : 0.4) : (hot ? 1 : 0.8))
-                .frame(width: 30, height: 28)
+                .frame(width: 30 * scale, height: 28 * scale)
                 .contentShape(.rect)
         }
         .buttonStyle(Squish())
@@ -315,15 +315,16 @@ struct PlayDisc: View {
     let glyph: Color
     let pointer: Pointer
     let act: () -> Void
+    var scale: CGFloat = 1
 
     var body: some View {
         let hot = pointer.over("pad.play")
         Button(action: act) {
             Image(systemName: playing ? "pause.fill" : "play.fill")
-                .font(.system(size: 14, weight: .heavy))
+                .font(.system(size: 14 * scale, weight: .heavy))
                 .foregroundStyle(glyph)
                 .offset(x: playing ? 0 : 1)
-                .frame(width: 36, height: 36)
+                .frame(width: 36 * scale, height: 36 * scale)
                 .background(Circle().fill(fill))
                 .contentShape(Circle())
         }
@@ -338,17 +339,18 @@ struct PlayDisc: View {
 struct Transport: View {
     let deck: Deck
     let pointer: Pointer
+    var scale: CGFloat = 1
 
     var body: some View {
         let tint = deck.swatch.lead
-        HStack(spacing: 8) {
+        HStack(spacing: 8 * scale) {
             Pad(symbol: "shuffle", size: 12, lit: deck.track.shuffle,
-                tip: deck.track.shuffle ? "Turn shuffle off" : "Turn shuffle on", tint: tint, pointer: pointer, act: deck.toggleShuffle)
-            Pad(symbol: "backward.end.fill", tip: "Previous track", tint: tint, pointer: pointer, act: deck.skipBack)
-            PlayDisc(playing: deck.isPlaying, fill: tint, glyph: deck.swatch.ground, pointer: pointer, act: deck.togglePlay)
-            Pad(symbol: "forward.end.fill", tip: "Next track", tint: tint, pointer: pointer, act: deck.skipForward)
+                tip: deck.track.shuffle ? "Turn shuffle off" : "Turn shuffle on", tint: tint, pointer: pointer, act: deck.toggleShuffle, scale: scale)
+            Pad(symbol: "backward.end.fill", tip: "Previous track", tint: tint, pointer: pointer, act: deck.skipBack, scale: scale)
+            PlayDisc(playing: deck.isPlaying, fill: tint, glyph: deck.swatch.ground, pointer: pointer, act: deck.togglePlay, scale: scale)
+            Pad(symbol: "forward.end.fill", tip: "Next track", tint: tint, pointer: pointer, act: deck.skipForward, scale: scale)
             Pad(symbol: "repeat", size: 12, lit: deck.track.loop,
-                tip: deck.track.loop ? "Turn repeat off" : "Turn repeat on", tint: tint, pointer: pointer, act: deck.toggleRepeat)
+                tip: deck.track.loop ? "Turn repeat off" : "Turn repeat on", tint: tint, pointer: pointer, act: deck.toggleRepeat, scale: scale)
         }
     }
 }
@@ -373,6 +375,7 @@ enum Clock {
 struct Scrubber: View {
     let deck: Deck
     let pointer: Pointer
+    var scale: CGFloat = 1
     private var dragFraction: Double? { pointer.scrub }
 
     var body: some View {
@@ -390,7 +393,7 @@ struct Scrubber: View {
                     Text("-" + Clock.short(max(0, length - shown)))
                         .foregroundStyle(.secondary)
                 }
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .font(.system(size: 10 * scale, weight: .medium).monospacedDigit())
             }
         }
     }
@@ -399,7 +402,7 @@ struct Scrubber: View {
         let hot = pointer.over(Zone.scrubber) || dragFraction != nil
         return GeometryReader { g in
             let w = max(1, g.size.width)
-            let h: CGFloat = hot ? 6 : 4
+            let h: CGFloat = (hot ? 6 : 4) * scale
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.16)).frame(height: h)
                 Capsule()
@@ -420,7 +423,7 @@ struct Scrubber: View {
                     pointer.scrub = nil
                 })
         }
-        .frame(height: 14)
+        .frame(height: 14 * scale)
         .zone(Zone.scrubber, pointer)
         .animation(.easeOut(duration: 0.12), value: hot)
         .help("Click or drag to move through the track")
@@ -468,11 +471,25 @@ struct Halo: View {
 
     var body: some View {
         let kick = (spectrum.feed == .live && playing) ? Double(spectrum.bands.first ?? 0) : 0
-        RoundedRectangle(cornerRadius: Metrics.corner + 2, style: .continuous)
-            .fill(AngularGradient(colors: [swatch.lead, swatch.echo, swatch.lead], center: .center))
-            .padding(Metrics.halo - 5)
-            .blur(radius: 13)
+        Canvas { context, size in
+            // Draw a bounded, rounded falloff instead of blurring beyond the
+            // transparent window. The outer pixels remain completely clear.
+            for distance in stride(from: Metrics.halo - 2, through: CGFloat.zero, by: -1) {
+                let inset = Metrics.halo - distance
+                let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                guard rect.width > 0, rect.height > 0 else { continue }
+                let radius = Metrics.corner + distance
+                let path = Path(roundedRect: rect, cornerRadius: radius)
+                var layer = context
+                let fade = 1 - distance / Metrics.halo
+                layer.opacity = Double(fade * fade) * exp(-Double(distance * distance) / 130)
+                layer.stroke(path, with: .linearGradient(
+                    Gradient(colors: [swatch.lead, swatch.echo]),
+                    startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height)), lineWidth: 2)
+            }
+        }
             .opacity((playing ? Metrics.glow : Metrics.glow * 0.56) + 0.4 * kick)
+            .allowsHitTesting(false)
             .animation(.easeOut(duration: 0.12), value: kick)
     }
 }

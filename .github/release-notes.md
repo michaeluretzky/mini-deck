@@ -4,7 +4,11 @@ Ongoing Spotify history now begins on first launch. Mini Deck privately saves ob
 
 All valid music records now count as **overall plays**, including short listens, with no minimum-duration threshold. Listening time uses only known measured duration; API-only records do not invent it. The private ongoing journal survives restarts and has a separate clear control. Existing imports are not modified by this change.
 
-Compact mode now centers the song/artist text and playback controls and adds a thin playback progress bar across the bottom. The small service icon remains at the top-right.
+Compact mode is a mini version of the normal player: left-aligned song, artist and album rows with their icons, the same five playback controls, and a smaller seekable playback strip with time labels. It uses the same view components at two-thirds scale rather than a different centered layout. The small service icon remains at the top-right; hover details stay limited to song and artist.
+
+Repeated Spotify IDs with identical title, artist and album metadata now share one displayed song row with summed plays. Original records and IDs remain intact; explicitly different live/remix/version labels remain separate. This applies to song details, artist/album lists, unique-song counts and combined history.
+
+The outer glow now uses a rounded falloff that reaches transparent pixels before the window edge, removing the rectangular blur cutoff.
 
 Version 1.4.4 displays song/album release dates as **September 2, 2020**. Spotify dates and Apple/MusicBrainz album-note fallbacks share the same format. Dates with only month or year precision remain **September 2020** or **2020**, without invented dates or timezone shifts. Artist birth and formation years are unchanged. Existing private listening data is preserved.
 

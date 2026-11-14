@@ -143,7 +143,9 @@ enum StatsBook {
         let keys = Set([track.primaryArtist, track.albumArtist]
             .filter { !$0.isEmpty && $0.caseInsensitiveCompare("Various Artists") != .orderedSame }.map(TitleTidy.key))
         let songs = keys.flatMap { snapshot.songsByArtist[$0] ?? [] }
-        let exact = snapshot.songs[track.trackID]
+        let exact = snapshot.songs[track.trackID].flatMap {
+            snapshot.songTotals[SpotifyArchive.displaySongKey(title: $0.title, artist: $0.artist, album: $0.album)]
+        }
         let matching = exact.map { [$0] } ?? songs.filter {
             SpotifyArchive.nameKey($0.title) == SpotifyArchive.nameKey(track.title)
             && (track.album.isEmpty || SpotifyArchive.nameKey($0.album) == SpotifyArchive.nameKey(track.album))
@@ -175,8 +177,13 @@ enum StatsBook {
         }
         out.album.add(albumTiles, from: source)
         func lines(_ rows: [SpotifyArchive.Total]) -> [HistoryLine] {
-            rows.sorted { $0.plays != $1.plays ? $0.plays > $1.plays : $0.title < $1.title }
-                .prefix(3).map { HistoryLine(title: $0.title, detail: plays($0.plays)) }
+            let titleCounts = Dictionary(grouping: rows, by: { SpotifyArchive.nameKey($0.title) })
+            return rows.sorted { $0.plays != $1.plays ? $0.plays > $1.plays : $0.title < $1.title }
+                .prefix(3).map {
+                    let album = (titleCounts[SpotifyArchive.nameKey($0.title)]?.count ?? 0) > 1 && !$0.album.isEmpty
+                        ? " · \($0.album)" : ""
+                    return HistoryLine(title: $0.title, detail: plays($0.plays) + album)
+                }
         }
         out.artist.list("Your top songs in saved history", lines(Array(songs)), from: source)
         out.album.list("Your top songs on this album", lines(Array(album)), from: source)

@@ -36,7 +36,18 @@ enum AccountHistory {
             song.recent = max(song.recent ?? item.at, item.at)
             indexed[id] = song
         }
-        return indexed.values.sorted {
+        var displayed: [String: Song] = [:]
+        for song in indexed.values.sorted(by: { $0.id < $1.id }) {
+            let key = song.album.isEmpty || song.title.isEmpty || song.artist.isEmpty ? song.id
+                : SpotifyArchive.displaySongKey(title: song.title, artist: song.artist, album: song.album)
+            if var same = displayed[key] {
+                same.years = Array(Set(same.years + song.years)).sorted(by: >)
+                same.recent = [same.recent, song.recent].compactMap { $0 }.max()
+                same.imported = [same.imported, song.imported].compactMap { $0 }.max()
+                displayed[key] = same
+            } else { displayed[key] = song }
+        }
+        return displayed.values.sorted {
             switch ($0.latest, $1.latest) {
             case let (a?, b?) where a != b: return a > b
             case (_?, nil): return true

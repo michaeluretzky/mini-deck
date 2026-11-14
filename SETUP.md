@@ -40,7 +40,7 @@ Use **Listening Stats > Import Full Spotify History…**, or the interactive gui
 - **Refresh later:** Import a newer export to replace the covered portion of ongoing history. Forward records after the export cutoff remain included. Missing export files and closed/offline periods can leave gaps; the app does not claim complete lifetime coverage.
 - **Batch large exports:** Limit each file to 64 MB and each import batch to 256 MB. Import multiple batches when necessary.
 
-Combined totals appear in the normal card, with additional details under **Show advanced**. The **Spotify history** tab shows recent records and top songs/artists/albums; list displays are capped at 100 rows, but totals use all saved records. Double-click compact mode intentionally shows only song/artist details, centered controls, and a thin playback bar.
+Combined totals appear in the normal card, with additional details under **Show advanced**. The **Spotify history** tab shows recent records and top songs/artists/albums; list displays are capped at 100 rows, but totals use all saved records. Double-click compact mode uses a miniature normal layout, including all playback controls and a seekable progress strip. Its hover panel intentionally shows only song/artist details.
 
 ### Historical song data
 
