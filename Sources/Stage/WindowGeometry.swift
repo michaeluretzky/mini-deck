@@ -5,6 +5,25 @@ import Foundation
 
 /// Pure display-coordinate math, including negative and vertically stacked screens.
 enum WindowGeometry {
+    enum Horizontal: String { case leading, center, trailing }
+    enum Vertical: String { case top, bottom }
+    struct Anchor: Equatable {
+        var horizontal: Horizontal
+        var vertical: Vertical
+    }
+
+    static func playArea(visibleFrame: CGRect, gap: CGFloat) -> CGRect {
+        visibleFrame.insetBy(dx: max(0, gap), dy: max(0, gap))
+    }
+
+    /// Choose once when the user moves the player, not again at every content resize.
+    static func anchor(for frame: CGRect, in area: CGRect) -> Anchor {
+        let horizontal: Horizontal = abs(frame.midX - area.midX) <= 20 ? .center
+            : (frame.midX < area.midX ? .leading : .trailing)
+        return Anchor(horizontal: horizontal,
+                      vertical: abs(frame.minY - area.minY) < abs(frame.maxY - area.maxY) ? .bottom : .top)
+    }
+
     static func screenIndex(for frame: CGRect, screens: [CGRect]) -> Int? {
         guard !screens.isEmpty else { return nil }
         let overlaps = screens.map { screen -> CGFloat in
@@ -42,12 +61,31 @@ enum WindowGeometry {
         return CGPoint(x: (x * pixels).rounded() / pixels, y: (y * pixels).rounded() / pixels)
     }
 
-    static func resized(_ frame: CGRect, to size: CGSize, in area: CGRect, growDown: Bool) -> CGRect {
-        let right = abs(frame.maxX - area.maxX) < 2
-        let centered = abs(frame.midX - area.midX) < 2
-        let bottom = abs(frame.minY - area.minY) < 2
-        let x = right ? frame.maxX - size.width : (centered ? area.midX - size.width / 2 : frame.minX)
-        let y = bottom && !growDown ? frame.minY : frame.maxY - size.height
+    static func resized(_ frame: CGRect, to size: CGSize, in area: CGRect, growDown: Bool,
+                        anchor: Anchor? = nil) -> CGRect {
+        let anchor = anchor ?? self.anchor(for: frame, in: area)
+        let x: CGFloat
+        switch anchor.horizontal {
+        case .leading: x = frame.minX
+        case .center: x = frame.midX - size.width / 2
+        case .trailing: x = frame.maxX - size.width
+        }
+        let y = anchor.vertical == .bottom && !growDown ? frame.minY : frame.maxY - size.height
         return CGRect(origin: CGPoint(x: x, y: y), size: size)
+    }
+
+    /// Preserve edge distances when a display's work area moves or changes size.
+    static func relocated(_ frame: CGRect, from old: CGRect, to area: CGRect, anchor: Anchor) -> CGRect {
+        var next = frame
+        switch anchor.horizontal {
+        case .leading: next.origin.x += area.minX - old.minX
+        case .center: next.origin.x += area.midX - old.midX
+        case .trailing: next.origin.x += area.maxX - old.maxX
+        }
+        switch anchor.vertical {
+        case .top: next.origin.y += area.maxY - old.maxY
+        case .bottom: next.origin.y += area.minY - old.minY
+        }
+        return next
     }
 }

@@ -61,6 +61,55 @@ await MainActor.run {
     let huge = CGRect(x: -1000, y: 0, width: 488, height: 1300)
     expect(WindowGeometry.origin(for: huge, in: area, snap: 20, clamp: true, scale: 2).y + huge.height == area.maxY,
            "oversize panel keeps its header visible")
+    let visible = CGRect(x: 0, y: 62, width: 1710, height: 1011)
+    let safe = WindowGeometry.playArea(visibleFrame: visible, gap: 10)
+    expect(safe == CGRect(x: 10, y: 72, width: 1690, height: 991),
+           "safe area leaves a positive margin for the full glow on every side")
+    let observed = CGRect(x: 1208, y: 734, width: 488, height: 218)
+    let edge = WindowGeometry.anchor(for: observed, in: safe)
+    let observedCompact = WindowGeometry.resized(observed, to: CGSize(width: 340, height: 163),
+                                                in: safe, growDown: false, anchor: edge)
+    expect(observedCompact.maxX == observed.maxX && observedCompact.maxY == observed.maxY,
+           "observed 14-point right gap survives compact mode instead of becoming 162")
+    expect(WindowGeometry.resized(observedCompact, to: observed.size, in: safe, growDown: false, anchor: edge) == observed,
+           "observed off-snap alignment round trips without drift")
+    for visibleArea in [visible, CGRect(x: -1920, y: 40, width: 1920, height: 1040),
+                        CGRect(x: 0, y: 940, width: 1600, height: 1160)] {
+        let bounds = WindowGeometry.playArea(visibleFrame: visibleArea, gap: 10)
+        for x in stride(from: bounds.minX, through: bounds.maxX - 488, by: 37) {
+            for y in [bounds.minY, bounds.minY + 14, bounds.maxY - 218] {
+                let original = CGRect(x: x, y: y, width: 488, height: 218)
+                let anchor = WindowGeometry.anchor(for: original, in: bounds)
+                var cycle = original
+                for _ in 0..<10 {
+                    cycle = WindowGeometry.resized(cycle, to: CGSize(width: 340, height: 163),
+                                                   in: bounds, growDown: false, anchor: anchor)
+                    cycle = WindowGeometry.resized(cycle, to: original.size,
+                                                   in: bounds, growDown: false, anchor: anchor)
+                }
+                expect(cycle == original, "ten size cycles preserve placement at \(x), \(y)")
+                let clamped = CGRect(origin: WindowGeometry.origin(for: cycle, in: bounds, snap: 0, clamp: true, scale: 2),
+                                     size: cycle.size)
+                expect(visibleArea.contains(clamped), "full glow remains within visible display")
+            }
+        }
+    }
+    let newArea = CGRect(x: -1910, y: 72, width: 1900, height: 950)
+    let movedDisplay = WindowGeometry.relocated(observed, from: safe, to: newArea, anchor: edge)
+    expect(newArea.maxX - movedDisplay.maxX == safe.maxX - observed.maxX,
+           "monitor changes preserve right edge distance")
+    expect(newArea.maxY - movedDisplay.maxY == safe.maxY - observed.maxY,
+           "monitor changes preserve top edge distance")
+    let bottomFrame = CGRect(x: safe.maxX - 488, y: safe.minY, width: 488, height: 218)
+    let bottomAnchor = WindowGeometry.anchor(for: bottomFrame, in: safe)
+    let drawerFrame = WindowGeometry.resized(bottomFrame, to: CGSize(width: 488, height: 700),
+                                             in: safe, growDown: true, anchor: bottomAnchor)
+    let boundedDrawer = CGRect(origin: WindowGeometry.origin(for: drawerFrame, in: safe, snap: 0, clamp: true, scale: 2),
+                              size: drawerFrame.size)
+    expect(safe.contains(boundedDrawer), "bottom drawer expansion stays inside full-glow safe area")
+    expect(WindowGeometry.resized(bottomFrame, to: bottomFrame.size, in: safe, growDown: false,
+                                  anchor: bottomAnchor) == bottomFrame,
+           "collapse uses resting frame rather than saving the shifted drawer")
     let now = Date().timeIntervalSince1970
 
     // MARK: Music library reader

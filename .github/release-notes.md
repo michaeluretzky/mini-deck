@@ -1,5 +1,7 @@
 A floating music controller for macOS that works with Spotify and Apple Music.
 
+Version 1.4.6 fixes screen-edge alignment. The complete glow stays inside the usable display with a 10-point outer margin at parked edges. Normal and compact sizes preserve the selected side or center anchor even away from an exact snap point. Drawer expansion no longer replaces the saved resting position, and display/Dock changes preserve edge distances. Saved placement now includes the resting size, display and anchor.
+
 Version 1.4.5 removes the extra “total songs/artists/albums” words beside play counts. Summary and advanced cards show only a smaller `/ N`, while retaining the large play count, card heading, and “overall plays” caption.
 
 Ongoing Spotify history now begins on first launch. Mini Deck privately saves observed Spotify playback and available recent account records, polls at startup and about every two minutes, attempts bounded catch-up, and reconciles local/API duplicates. The combined song, artist, album, and history totals include forward records after the imported export cutoff. A newer export takes precedence through its cutoff. Closed/offline gaps and missing export files can still leave incomplete coverage; this is not a claim of guaranteed full synchronization ([Spotify recent history API](https://developer.spotify.com/documentation/web-api/reference/get-recently-played)).

@@ -79,10 +79,15 @@ final class Stage {
     private(set) var isShown = false
     private(set) var maxPanelHeight: CGFloat = 800
     @ObservationIgnored private var panel: DeckPanel?
-    @ObservationIgnored private var grab: (mouse: NSPoint, origin: NSPoint)?
+    @ObservationIgnored private var grab: (mouse: NSPoint, topLeft: NSPoint)?
     @ObservationIgnored private var pendingFit: (height: CGFloat, width: CGFloat, growDown: Bool)?
     @ObservationIgnored private var fitScheduled = false
     @ObservationIgnored private var restingFrame: NSRect?
+    @ObservationIgnored private var restingArea: NSRect?
+    @ObservationIgnored private var placement: WindowGeometry.Anchor?
+    @ObservationIgnored private var homeScreenID: UInt32?
+    @ObservationIgnored private var drawerExpanded = false
+    @ObservationIgnored private var adjustingFrame = false
     @ObservationIgnored var onScaleChange: ((CGFloat) -> Void)?
 
     var scale: CGFloat { panel?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
@@ -114,7 +119,7 @@ final class Stage {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.onScaleChange?(self.scale)
-                    if self.grab == nil { self.settle() }
+                    if self.grab == nil && !self.adjustingFrame { self.settle() }
                 }
             }
         }
@@ -145,14 +150,18 @@ final class Stage {
     private func screen(for frame: NSRect) -> NSScreen? {
         if grab != nil, let s = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) { return s }
         let screens = NSScreen.screens
+        if let homeScreenID, let home = screens.first(where: { screenID($0) == homeScreenID }) { return home }
         guard let index = WindowGeometry.screenIndex(for: frame, screens: screens.map(\.frame)) else { return NSScreen.main }
         return screens[index]
     }
 
-    /// Where the card may sit: the visible screen less a small gap. The glow is allowed to spill past it.
+    private func screenID(_ screen: NSScreen) -> UInt32? {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+
+    /// Reserve the same clear margin around the entire window, including its glow.
     private func playArea(for frame: NSRect) -> NSRect? {
-        let d = Metrics.screenGap - Metrics.halo
-        return screen(for: frame)?.visibleFrame.insetBy(dx: d, dy: d)
+        screen(for: frame).map { WindowGeometry.playArea(visibleFrame: $0.visibleFrame, gap: Metrics.screenGap) }
     }
 
     private func magnetize(_ f: NSRect, clamp: Bool) -> NSPoint {
@@ -161,31 +170,47 @@ final class Stage {
                                      scale: screen(for: f)?.backingScaleFactor ?? scale)
     }
 
-    private func glide(to frame: NSRect) {
+    private func apply(_ frame: NSRect) {
         guard let panel else { return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(frame, display: true)
-        }
-        remember(frame)
+        adjustingFrame = true
+        panel.setFrame(frame, display: true, animate: false)
+        adjustingFrame = false
     }
 
     private func remember(_ frame: NSRect) {
         restingFrame = frame
+        restingArea = playArea(for: frame)
+        if let screen = screen(for: frame) { homeScreenID = screenID(screen) }
+        if placement == nil, let area = restingArea { placement = WindowGeometry.anchor(for: frame, in: area) }
         UserDefaults.standard.set(NSStringFromPoint(NSPoint(x: frame.minX, y: frame.maxY)), forKey: PrefKey.anchor)
+        UserDefaults.standard.set(NSStringFromRect(frame), forKey: "minideck.restingFrame")
+        if let restingArea { UserDefaults.standard.set(NSStringFromRect(restingArea), forKey: "minideck.restingArea") }
+        UserDefaults.standard.set(homeScreenID.map { NSNumber(value: $0) }, forKey: "minideck.homeScreen")
+        UserDefaults.standard.set(placement?.horizontal.rawValue, forKey: "minideck.horizontalAnchor")
+        UserDefaults.standard.set(placement?.vertical.rawValue, forKey: "minideck.verticalAnchor")
     }
 
     private func restorePosition() {
         guard let panel else { return }
         var f = panel.frame
-        if let saved = UserDefaults.standard.string(forKey: PrefKey.anchor) {
+        let store = UserDefaults.standard
+        if let saved = store.string(forKey: "minideck.restingFrame") {
+            let stored = NSRectFromString(saved)
+            if stored.width > 100 && stored.height > 30 { f = stored }
+            if let area = store.string(forKey: "minideck.restingArea") { restingArea = NSRectFromString(area) }
+            homeScreenID = (store.object(forKey: "minideck.homeScreen") as? NSNumber)?.uint32Value
+            if let h = store.string(forKey: "minideck.horizontalAnchor").flatMap(WindowGeometry.Horizontal.init(rawValue:)),
+               let v = store.string(forKey: "minideck.verticalAnchor").flatMap(WindowGeometry.Vertical.init(rawValue:)) {
+                placement = WindowGeometry.Anchor(horizontal: h, vertical: v)
+            }
+        } else if let saved = store.string(forKey: PrefKey.anchor) {
             let topLeft = NSPointFromString(saved)
             f.origin = NSPoint(x: topLeft.x, y: topLeft.y - f.height)
         } else if let a = playArea(for: NSScreen.main?.frame ?? f) {
             f.origin = NSPoint(x: a.maxX - f.width, y: a.maxY - f.height)
         }
-        panel.setFrame(f, display: false)
+        restingFrame = f
+        apply(f)
     }
 
     // MARK: Moving
@@ -194,38 +219,57 @@ final class Stage {
         guard let panel else { return }
         let mouse = NSEvent.mouseLocation
         if grab == nil {
+            if drawerExpanded, let restingFrame {
+                let f = panel.frame
+                apply(NSRect(x: f.minX, y: f.maxY - restingFrame.height, width: f.width, height: restingFrame.height))
+                drawerExpanded = false
+            }
             restingFrame = nil
-            grab = (mouse, panel.frame.origin)
+            grab = (mouse, NSPoint(x: panel.frame.minX, y: panel.frame.maxY))
             NSCursor.closedHand.push()
         }
         guard let g = grab else { return }
         var f = panel.frame
-        f.origin = NSPoint(x: g.origin.x + mouse.x - g.mouse.x, y: g.origin.y + mouse.y - g.mouse.y)
-        panel.setFrameOrigin(magnetize(f, clamp: false))
+        f.origin = NSPoint(x: g.topLeft.x + mouse.x - g.mouse.x,
+                           y: g.topLeft.y + mouse.y - g.mouse.y - f.height)
+        f.origin = magnetize(f, clamp: false)
+        apply(f)
     }
 
     func dragEnded() {
         guard grab != nil else { return }
+        if let panel, let target = screen(for: panel.frame) { homeScreenID = screenID(target) }
         grab = nil
+        restingFrame = panel?.frame
+        restingArea = restingFrame.flatMap { playArea(for: $0) }
+        placement = nil
         NSCursor.pop()
         settle()
     }
 
     /// Pulls the card fully back on screen after a drag, a display change, or a resize.
     func settle() {
-        guard let panel else { return }
-        var f = panel.frame
-        if let area = playArea(for: f), maxPanelHeight != area.height { maxPanelHeight = area.height }
-        f.origin = magnetize(f, clamp: true)
-        // Automatic display correction should not queue an animation behind pointer motion.
-        panel.setFrame(f, display: true, animate: false)
-        remember(f)
+        guard let panel, grab == nil, !adjustingFrame else { return }
+        var base = restingFrame ?? panel.frame
+        guard let area = playArea(for: base) else { return }
+        let anchor = placement ?? WindowGeometry.anchor(for: base, in: restingArea ?? area)
+        placement = anchor
+        if let previous = restingArea, previous != area {
+            base = WindowGeometry.relocated(base, from: previous, to: area, anchor: anchor)
+        }
+        if maxPanelHeight != area.height { maxPanelHeight = area.height }
+        base.origin = WindowGeometry.origin(for: base, in: area, snap: Metrics.pull, clamp: true, scale: scale)
+        remember(base)
+        var shown = drawerExpanded
+            ? WindowGeometry.resized(base, to: panel.frame.size, in: area, growDown: true, anchor: anchor) : base
+        shown.origin = WindowGeometry.origin(for: shown, in: area, snap: 0, clamp: true, scale: scale)
+        apply(shown)
     }
 
     func park(at corner: Corner) {
         if !isShown { show() }
         guard let panel, let a = playArea(for: panel.frame) else { return }
-        var f = panel.frame
+        var f = restingFrame ?? panel.frame
         let left = a.minX, middle = a.midX - f.width / 2, right = a.maxX - f.width
         let top = a.maxY - f.height, bottom = a.minY
         switch corner {
@@ -236,8 +280,10 @@ final class Stage {
         case .bottom: f.origin = NSPoint(x: middle, y: bottom)
         case .bottomTrailing: f.origin = NSPoint(x: right, y: bottom)
         }
-        f.origin = NSPoint(x: f.origin.x.rounded(), y: f.origin.y.rounded())
-        glide(to: f)
+        f.origin = WindowGeometry.origin(for: f, in: a, snap: 0, clamp: true, scale: scale)
+        placement = WindowGeometry.anchor(for: f, in: a)
+        remember(f)
+        settle()
     }
 
     /// Grows or shrinks to the content. The top edge stays put unless the card sits on the bottom edge.
@@ -259,16 +305,21 @@ final class Stage {
         guard let panel, height > 30, width > 100 else { return }
         let height = ceil(height * scale) / scale
         let f = panel.frame
+        drawerExpanded = growDown
         guard abs(f.height - height) > 0.5 || f.width != width else { return }
+        if grab != nil {
+            apply(NSRect(x: f.minX, y: f.maxY - height, width: width, height: height))
+            return
+        }
         let base = restingFrame ?? f
         guard let area = playArea(for: base) else { return }
         var next = WindowGeometry.resized(base, to: CGSize(width: width, height: height),
-                                          in: area, growDown: growDown)
+                                          in: area, growDown: growDown, anchor: placement)
         // Stay on the same monitor when expanding; the larger frame must not select a neighbor.
-        next.origin = WindowGeometry.origin(for: next, in: area, snap: Metrics.pull, clamp: true, scale: scale)
+        next.origin = WindowGeometry.origin(for: next, in: area, snap: 0, clamp: true, scale: scale)
         // Content expansion must not start an AppKit animation for every
-        // SwiftUI size measurement. Keep gliding only for explicit moves.
-        panel.setFrame(next, display: true, animate: false)
+        // SwiftUI size measurement or re-anchor a temporary expanded frame.
+        apply(next)
         if !growDown { remember(next) }
     }
 }
