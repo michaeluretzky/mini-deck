@@ -79,6 +79,9 @@ final class DeckHostView<Content: View>: NSHostingView<Content> {
 @MainActor @Observable
 final class Stage {
     private(set) var isShown = false
+    /// False for one frame each time the player appears, then springs to true,
+    /// so the card grows from smaller to full size.
+    private(set) var grown = true
     private(set) var maxPanelHeight: CGFloat = 800
     @ObservationIgnored private var panel: DeckPanel?
     @ObservationIgnored private var grab: (mouse: NSPoint, topLeft: NSPoint)?
@@ -147,9 +150,19 @@ final class Stage {
     func show() {
         guard let panel else { return }
         panel.orderFrontRegardless()
+        if !isShown { growIn() }
         isShown = true
         settle()
         reportVisibility()
+    }
+
+    private func growIn() {
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) { grown = false }
+        DispatchQueue.main.async { [weak self] in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { self?.grown = true }
+        }
     }
 
     func hide() {
