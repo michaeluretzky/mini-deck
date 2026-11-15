@@ -18,6 +18,10 @@ struct DeckRoot: View {
             })
             // Visual only: the window is already full size, so this never delays or resizes it.
             .modifier(GrowIn(grown: hub.stage.grown))
+            // Compact and full size morph into each other, pinned to the card's resting corner.
+            .scaleEffect(hub.stage.morphScale, anchor: hub.stage.morphAnchor)
+            .blur(radius: 8 * hub.stage.morphBlur)
+            .opacity(Double(1 - 0.45 * hub.stage.morphBlur))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .coordinateSpace(.named(Space.deck))
     }

@@ -2,6 +2,7 @@
 // Free for personal use. See LICENSE.
 
 import CoreGraphics
+import Foundation
 
 /// Sizes for the notch player. All rects use screen coordinates with y growing upward.
 enum NotchGeometry {
@@ -15,6 +16,16 @@ enum NotchGeometry {
     /// Size used on screens without a camera notch.
     static let virtualWidth: CGFloat = 180
     static let minimumHeight: CGFloat = 24
+    /// Damping for the opening spring. Below 1 it overshoots a little before settling.
+    static let openDamping: Double = 0.76
+    /// Extra room on each side of the window so the overshoot is never cut off.
+    static let overshootRoom: CGFloat = 16
+
+    /// Largest overshoot of a damped spring, as a fraction of the distance it travels.
+    static func springPeak(damping z: Double) -> Double {
+        guard z > 0 && z < 1 else { return 0 }
+        return exp(-Double.pi * z / (1 - z * z).squareRoot())
+    }
 
     /// The camera notch, or a virtual one centered at the top of screens without a notch.
     /// `leftWidth` and `rightWidth` are the widths of the usable areas beside the notch.
@@ -45,11 +56,11 @@ enum NotchGeometry {
 
     /// The window holds the open player plus the curves at the top corners.
     static func window(_ notch: CGRect, screen: CGRect) -> CGRect {
-        var open = expanded(notch, screen: screen).insetBy(dx: -flare, dy: 0)
+        var open = expanded(notch, screen: screen).insetBy(dx: -(flare + overshootRoom), dy: 0)
         open.size.width = min(open.width, screen.width)
         let x = min(max(open.minX, screen.minX), screen.maxX - open.width)
-        // Room below for the shadow of the open player.
-        return CGRect(x: x, y: open.minY - 16, width: open.width, height: open.height + 16)
+        // Room below for the shadow and the opening overshoot.
+        return CGRect(x: x, y: open.minY - overshootRoom, width: open.width, height: open.height + overshootRoom)
     }
 
     /// Where the pointer opens the player. It reaches the top edge so moving into the

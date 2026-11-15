@@ -74,13 +74,11 @@ struct NotchRoot: View {
                     NotchPlayer(state: state, deck: deck, pointer: pointer, spectrum: spectrum, soundBars: soundBars,
                                 actions: actions)
                         .frame(width: state.open.width, height: state.open.height, alignment: .top)
-                        .transition(reduceMotion ? .opacity
-                                    : .asymmetric(insertion: .scale(scale: 0.55, anchor: .top).combined(with: .opacity),
-                                                  removal: .opacity))
+                        .transition(reduceMotion ? .opacity : .island(anchor: .top, scale: 0.86))
                 } else if wings {
                     NotchWings(deck: deck, spectrum: spectrum, soundBars: soundBars, height: state.notch.height,
                                gap: state.notch.width)
-                        .transition(.opacity)
+                        .transition(reduceMotion ? .opacity : .island(anchor: .top, scale: 0.94))
                 }
             }
         }
@@ -91,9 +89,10 @@ struct NotchRoot: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(.named(Space.deck))
         .environment(\.colorScheme, .dark)
-        // Starts in the same frame as the pointer move, then grows from the notch to full size.
-        // Reduce Motion swaps the grow for a short fade.
-        .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.28, dampingFraction: 0.8), value: open)
+        // Like the Dynamic Island: starts in the same frame as the pointer move, springs out of
+        // the notch with a small overshoot, and springs back without a bounce.
+        // Reduce Motion swaps the spring for a short fade.
+        .animation(reduceMotion ? Motion.reduced : open ? Motion.open : Motion.close, value: open)
         .animation(.easeOut(duration: 0.18), value: wings)
     }
 }
