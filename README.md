@@ -65,7 +65,7 @@ Mini Deck checks GitHub about once a day for a new release and shows a message w
 
 ### Accessibility
 
-Every button, the playback bar and the stat cards have VoiceOver labels. With VoiceOver, swipe up or down on the playback bar to move 10 seconds. When **Reduce Motion** is on in System Settings > Accessibility > Display, the player appears without the grow animation.
+Every button, the playback bar and the stat cards have VoiceOver labels. With VoiceOver, swipe up or down on the playback bar to move 10 seconds. When **Reduce Motion** is on in System Settings > Accessibility > Display, the player appears and changes size without the grow, spring and blur animations.
 
 ## Energy use
 

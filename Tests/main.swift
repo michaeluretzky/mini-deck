@@ -534,6 +534,14 @@ func checkNotch() {
     expect(open.maxY == screen.maxY && open.height == 32 + NotchGeometry.expandedBody, "open player hangs from the top edge")
     let window = NotchGeometry.window(notch, screen: screen)
     expect(window.contains(open) && screen.contains(window), "window holds the open player and stays on screen")
+    let peak = CGFloat(NotchGeometry.springPeak(damping: NotchGeometry.openDamping))
+    expect(peak > 0.01 && peak < 0.1, "opening spring overshoots a little, like the Dynamic Island")
+    let grow = CGSize(width: open.width - closed.width, height: open.height - notch.height)
+    expect(window.minX <= open.minX - NotchGeometry.flare - grow.width * peak / 2
+           && window.maxX >= open.maxX + NotchGeometry.flare + grow.width * peak / 2
+           && window.minY <= open.minY - grow.height * peak,
+           "window has room for the overshoot, so the shape is never cut off")
+    expect(NotchGeometry.springPeak(damping: 1) == 0, "a fully damped spring does not overshoot")
     let hover = NotchGeometry.hoverZone(closed)
     expect(hover.contains(CGPoint(x: notch.midX, y: screen.maxY - 1)), "pointing at the notch opens the player")
     expect(hover.contains(CGPoint(x: closed.minX + 2, y: notch.midY)), "pointing at a wing opens the player")

@@ -216,12 +216,14 @@ final class Hub {
     }
 
     func setCompact(_ compact: Bool) {
-        guard prefs.compactView != compact else { return }
+        guard prefs.compactView != compact, !stage.morphing else { return }
         // A double-click can begin a tiny drag; finish it before the card is rebuilt.
         stage.cancelDrag()
-        pointer.resetLayout()
-        cardSizing.reset(compact: compact)
-        prefs.compactView = compact
+        stage.morph(shrinking: compact, ratio: Metrics.compactCard / Metrics.card) { [self] in
+            pointer.resetLayout()
+            cardSizing.reset(compact: compact)
+            prefs.compactView = compact
+        }
     }
 
     func showHistory(source: HistorySource? = nil) {

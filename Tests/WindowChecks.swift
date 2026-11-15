@@ -219,12 +219,13 @@ struct WindowChecks {
             let state = NotchState()
             state.notch = notch
             state.open = open
-            // Damped spring with response 0.28 s and damping 0.8, sampled at 30 frames a second.
+            // The app's opening spring (Motion.open), sampled at 30 frames a second.
             func spring(_ t: Double) -> Double {
-                let w = 2 * Double.pi / 0.28, z = 0.8, wd = w * (1 - z * z).squareRoot()
+                guard t > 0 else { return 0 }
+                let w = 2 * Double.pi / Motion.openResponse, z = Motion.openDamping, wd = w * (1 - z * z).squareRoot()
                 return 1 - exp(-z * w * t) * (cos(wd * t) + z * w / wd * sin(wd * t))
             }
-            for frameIndex in 0..<16 {
+            for frameIndex in 0..<18 {
                 let p = CGFloat(spring(Double(frameIndex) / 30))
                 let closedWidth = notch.width + 2 * NotchGeometry.wing
                 let width = closedWidth + (open.width - closedWidth) * p + 2 * flare
@@ -240,8 +241,9 @@ struct WindowChecks {
                             NotchPlayer(state: state, deck: deck, pointer: Pointer(), spectrum: Spectrum(), soundBars: true,
                                         actions: NotchActions())
                                 .frame(width: open.width, height: open.height, alignment: .top)
-                                .scaleEffect(0.55 + 0.45 * min(1, p), anchor: .top)
-                                .opacity(Double(min(1, p * 1.4)))
+                                // Content follows the same spring 0.03 s later, sharpening out of a blur.
+                                .modifier(BlurMorph(amount: 1 - CGFloat(spring(Double(frameIndex) / 30 - 0.03)),
+                                                    scale: 0.86, anchor: .top))
                         }
                     }
                     .mask(alignment: .top) { NotchOutline(bottom: bottom).frame(width: width, height: height) }

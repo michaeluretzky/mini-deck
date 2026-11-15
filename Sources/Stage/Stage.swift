@@ -82,6 +82,10 @@ final class Stage {
     /// False for one frame each time the player appears, then springs to true,
     /// so the card grows from smaller to full size.
     private(set) var grown = true
+    /// Scale and blur used while the card switches between compact and full size.
+    private(set) var morphScale: CGFloat = 1
+    private(set) var morphBlur: CGFloat = 0
+    @ObservationIgnored private(set) var morphing = false
     private(set) var maxPanelHeight: CGFloat = 800
     @ObservationIgnored private var panel: DeckPanel?
     @ObservationIgnored private var grab: (mouse: NSPoint, topLeft: NSPoint)?
@@ -166,7 +170,62 @@ final class Stage {
         reset.disablesAnimations = true
         withTransaction(reset) { grown = false }
         DispatchQueue.main.async { [weak self] in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { self?.grown = true }
+            withAnimation(Motion.open) { self?.grown = true }
+        }
+    }
+
+    /// The corner the card stays pinned to while it resizes, so the morph grows away from it.
+    var morphAnchor: UnitPoint {
+        let a = placement ?? WindowGeometry.Anchor(horizontal: .trailing, vertical: .top)
+        switch (a.horizontal, a.vertical) {
+        case (.leading, .top): return .topLeading
+        case (.center, .top): return .top
+        case (.trailing, .top): return .topTrailing
+        case (.leading, .bottom): return .bottomLeading
+        case (.center, .bottom): return .bottom
+        case (.trailing, .bottom): return .bottomTrailing
+        }
+    }
+
+    /// Morphs the card to a new size the way the Dynamic Island changes shape.
+    /// Growing: the bigger layout appears at once, starting at the old size, and springs out
+    /// with a small overshoot while it sharpens. Shrinking: the current card first shrinks toward
+    /// the smaller size inside its own window, so nothing is ever cut off, then the smaller layout
+    /// springs into place. Both start on the same frame as the click.
+    func morph(shrinking: Bool, ratio: CGFloat, swap: @escaping () -> Void) {
+        guard !Motion.reduceMotion, isShown else {
+            swap()
+            return
+        }
+        morphing = true
+        if shrinking {
+            withAnimation(.easeIn(duration: Motion.morphOut), completionCriteria: .logicallyComplete) {
+                morphScale = ratio
+                morphBlur = 0.6
+            } completion: { [weak self] in
+                swap()
+                self?.arrive(from: 0.94, blur: 0.6)
+            }
+        } else {
+            swap()
+            arrive(from: ratio, blur: 0.8)
+        }
+    }
+
+    private func arrive(from scale: CGFloat, blur: CGFloat) {
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) {
+            morphScale = scale
+            morphBlur = blur
+        }
+        DispatchQueue.main.async { [weak self] in
+            withAnimation(Motion.open, completionCriteria: .logicallyComplete) {
+                self?.morphScale = 1
+                self?.morphBlur = 0
+            } completion: { [weak self] in
+                self?.morphing = false
+            }
         }
     }
 
