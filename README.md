@@ -1,20 +1,32 @@
-# Mini Deck
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="Assets/readme/title-dark-mode.png">
+    <img src="Assets/readme/title-light-mode.png" alt="Mini Deck" width="420">
+  </picture>
+</p>
 
-Mini Deck is a floating music controller for macOS. It works with Spotify and Apple Music.
+<p align="center">A small floating music player for your Mac. Works with Spotify and Apple Music.</p>
 
-**[Download the latest version](https://github.com/michaeluretzky/mini-deck/releases/latest)**: free for personal use. Runs on Apple silicon and Intel Macs with macOS 14 or later.
+<p align="center"><b><a href="https://github.com/michaeluretzky/mini-deck/releases/latest">Download the latest version</a></b><br>
+Free for personal use · Apple silicon and Intel · macOS 14 or later</p>
 
-## Download and install
+<p align="center">
+  <img src="Assets/readme/notch-open.gif" alt="The Mini Deck notch player growing open under the camera notch" width="560">
+</p>
 
-1. Open the [latest release](https://github.com/michaeluretzky/mini-deck/releases/latest) and download `Mini-Deck-<version>.zip`.
-2. Double-click the zip, then drag **Mini Deck** into your **Applications** folder.
-3. Open Mini Deck. macOS blocks it the first time because it isn't from the App Store. Click **Done**.
-4. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway** next to Mini Deck. Confirm with your password.
-5. Mini Deck appears in the menu bar and as a floating card. Allow access to Spotify or Music when asked.
+## Install in 30 seconds
 
-Double-click the widget to switch between normal and compact views. Compact view keeps the cover, song, artist and basic playback controls; hovering over its cover shows brief song and artist details only. Double-click again for the full player and listening statistics. **Compact View** is also available in the right-click and menu-bar menus.
+1. Download `Mini-Deck-<version>.zip` from the [latest release](https://github.com/michaeluretzky/mini-deck/releases/latest) and double-click it.
+2. Drag **Mini Deck** into **Applications**, then open it.
+3. If macOS says it can't check the app, click **Done**, go to **System Settings > Privacy & Security**, and click **Open Anyway**. You only do this once.
+4. Play a song in Spotify or Music. Click **Allow** when macOS asks if Mini Deck can control it.
 
-If you're comfortable with Terminal, this also clears the block:
+That's it. Mini Deck lives in the menu bar and as a floating card.
+
+<details>
+<summary>More install options</summary>
+
+If you're comfortable with Terminal, this also clears the first-launch block:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/Mini Deck.app"
@@ -22,7 +34,38 @@ xattr -dr com.apple.quarantine "/Applications/Mini Deck.app"
 
 To check the download, compare `shasum -a 256 Mini-Deck-<version>.zip` with the `.sha256` file on the release page.
 
-To update, quit Mini Deck, replace the app in Applications, and open it again. macOS may ask for permissions again.
+To update by hand, quit Mini Deck, replace the app in Applications, and open it again. macOS may ask for permissions again.
+</details>
+
+## How to use it
+
+- **Double-click** the player to switch between the full and compact views.
+- **Drag** it anywhere. **Scroll** over it to change the volume. **Right-click** for more options.
+- **Show in Notch** (menu bar icon): the player moves into the camera notch. Point at the notch to open it.
+- **Listening History** (menu bar, or ⌘Y): your recent plays and top songs, artists and albums.
+
+<p align="center">
+  <img src="Assets/readme/notch.png" alt="Show in Notch, closed and open, with a sample song" width="560">
+</p>
+
+### Keyboard shortcuts
+
+These work from any app. Turn them off in menu bar > Keyboard Shortcuts.
+
+| Shortcut | Action |
+| --- | --- |
+| ⌃⌥P | Play or pause |
+| ⌃⌥] | Next track |
+| ⌃⌥[ | Previous track |
+| ⌃⌥M | Show or hide the player |
+
+### Updates
+
+Mini Deck checks GitHub about once a day for a new release and shows a message when one is out. Choose **Check for Updates…** in the menu bar to check now, or turn off **Check for Updates Automatically**. The check sends no personal data.
+
+### Accessibility
+
+Every button, the playback bar and the stat cards have VoiceOver labels. With VoiceOver, swipe up or down on the playback bar to move 10 seconds. When **Reduce Motion** is on in System Settings > Accessibility > Display, the player appears without the grow animation.
 
 ## Energy use
 
@@ -32,6 +75,7 @@ Mini Deck checks playback every second only while a song plays and the player is
 
 - **Apple Music:** nothing to set up. Play something in the Music app.
 - **Spotify:** controls work right away with the Spotify desktop app. Your Spotify account stats are optional and need a one-time setup (see [Connect Spotify](#connect-spotify)).
+- **Spotify account limit:** Spotify lets only 5 people connect to one developer app, and gives larger limits only to registered businesses ([Spotify quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes)). So most people create their own free Spotify developer app; Setup & Help walks you through it in a few minutes. Playback controls and stats from an imported Spotify export don't need this.
 - Choose which app to follow from menu bar > Follow.
 
 ## Features
@@ -129,6 +173,10 @@ open ~/Applications/"Mini Deck.app"
 ```
 
 Run the script again after any code change. Because the app is signed only for this Mac, macOS may ask for permissions again after a rebuild. `zsh make-release.zsh` builds the same universal zip that's on the Releases page.
+
+### Signed releases (for the maintainer)
+
+The release workflow signs and notarizes the app when these repository secrets are set: `DEVELOPER_ID_P12_BASE64` (the Developer ID Application certificate, base64), `DEVELOPER_ID_P12_PASSWORD`, `DEVELOPER_ID_IDENTITY` (for example `Developer ID Application: Name (TEAMID)`), `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and `NOTARY_APP_PASSWORD` (an app-specific password). A notarized app opens with a normal double-click, so step 3 of the install isn't needed. Without the secrets, releases keep the local signature.
 
 ## Permissions
 

@@ -53,11 +53,35 @@ cp "$root/Assets/NOTICE.txt" "$app/Contents/Resources/NOTICE.txt"
 print -n "APPL????" > "$app/Contents/PkgInfo"
 
 xattr -cr "$app"
-codesign --force --deep --sign - "$app"
+# With a Developer ID certificate, sign with the hardened runtime so Apple can notarize the app.
+# Without one, fall back to a local (ad hoc) signature; people then use Open Anyway the first time.
+if [[ -n "${MINIDECK_SIGN_IDENTITY:-}" ]]; then
+  print "Signing with $MINIDECK_SIGN_IDENTITY..."
+  codesign --force --options runtime --timestamp \
+    --entitlements "$root/Tools/MiniDeck.entitlements" \
+    --sign "$MINIDECK_SIGN_IDENTITY" "$app"
+else
+  print "No Developer ID set; using an ad hoc signature."
+  codesign --force --deep --sign - "$app"
+fi
 codesign --verify --deep --strict "$app"
 
 rm -f "$zip"
 ditto -c -k --keepParent --norsrc --noextattr "$app" "$zip"
+
+# Notarize when Apple ID details are available, then staple the ticket and zip again.
+if [[ -n "${MINIDECK_SIGN_IDENTITY:-}" && -n "${MINIDECK_NOTARY_APPLE_ID:-}" \
+      && -n "${MINIDECK_NOTARY_TEAM_ID:-}" && -n "${MINIDECK_NOTARY_PASSWORD:-}" ]]; then
+  print "Sending to Apple for notarization..."
+  xcrun notarytool submit "$zip" --wait \
+    --apple-id "$MINIDECK_NOTARY_APPLE_ID" --team-id "$MINIDECK_NOTARY_TEAM_ID" \
+    --password "$MINIDECK_NOTARY_PASSWORD"
+  xcrun stapler staple "$app"
+  xcrun stapler validate "$app"
+  spctl --assess --type execute --verbose "$app"
+  rm -f "$zip"
+  ditto -c -k --keepParent --norsrc --noextattr "$app" "$zip"
+fi
 ( cd "$dist" && shasum -a 256 "${zip:t}" > "${zip:t}.sha256" )
 print "Done: $zip"
 cat "$zip.sha256"

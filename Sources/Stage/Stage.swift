@@ -157,6 +157,11 @@ final class Stage {
     }
 
     private func growIn() {
+        // With Reduce Motion on, the player appears at full size without growing.
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            grown = true
+            return
+        }
         var reset = Transaction()
         reset.disablesAnimations = true
         withTransaction(reset) { grown = false }

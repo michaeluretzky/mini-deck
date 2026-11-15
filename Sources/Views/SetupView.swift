@@ -106,6 +106,7 @@ struct SetupView: View {
                 Button("Open Spotify") { Players.reveal(.spotify) }.disabled(!Players.isInstalled(.spotify))
                 Button("Open Music") { Players.reveal(.music) }.disabled(!Players.isInstalled(.music))
             }
+            quickTips
             Divider()
             Text("If macOS asks to let Mini Deck control Spotify or Music, choose Allow to enable playback detection. You remain in control of all permissions.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -113,6 +114,29 @@ struct SetupView: View {
                 open("x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
             }
         }
+    }
+
+    /// The basics a new person needs, shown on the first setup page.
+    private var quickTips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Quick tips").font(.headline)
+            tip("cursorarrow.click.2", "Double-click the player to switch between the full and compact views.")
+            tip("hand.draw", "Drag it anywhere. Scroll over it to change the volume. Right-click for more options.")
+            tip("rectangle.topthird.inset.filled", "Prefer the top of the screen? Choose Show in Notch from the menu bar icon.")
+            tip("keyboard", "Shortcuts: ⌃⌥P play or pause, ⌃⌥] next, ⌃⌥[ previous, ⌃⌥M show or hide.")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func tip(_ symbol: String, _ text: String) -> some View {
+        Label {
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 20)
+        }
+        .font(.callout)
     }
 
     private var history: some View {

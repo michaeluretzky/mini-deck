@@ -179,6 +179,10 @@ struct CoverTile: View {
         }
         .shadow(color: deck.swatch.ground.opacity(0.9), radius: 6, y: 3)
         .zone(Zone.cover, pointer)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isImage)
+        .accessibilityLabel(deck.hasTrack ? "Album cover, \(deck.track.album)" : "No song playing")
+        .accessibilityHint(compact ? "Double-click for the full player" : "Double-click for the compact player")
         .help(compact
               ? "Hover for brief song and artist details. Double-click to restore the normal player."
               : "Hover for song, artist and listening details. Double-click for the compact player.")
@@ -348,6 +352,8 @@ struct Pad: View {
     let pointer: Pointer
     let act: () -> Void
     var scale: CGFloat = 1
+    /// What VoiceOver reads. Toggles also report On or Off.
+    var name: String?
 
     var body: some View {
         let id = "pad." + symbol
@@ -365,6 +371,8 @@ struct Pad: View {
         .scaleEffect(hot ? 1.1 : 1)
         .animation(.easeOut(duration: 0.12), value: hot)
         .help(tip)
+        .accessibilityLabel(name ?? tip)
+        .accessibilityValue(lit.map { $0 ? "On" : "Off" } ?? "")
     }
 }
 
@@ -392,6 +400,7 @@ struct PlayDisc: View {
         .scaleEffect(hot ? 1.07 : 1)
         .animation(.easeOut(duration: 0.12), value: hot)
         .help(playing ? "Pause" : "Play")
+        .accessibilityLabel(playing ? "Pause" : "Play")
     }
 }
 
@@ -404,12 +413,14 @@ struct Transport: View {
         let tint = deck.swatch.lead
         HStack(spacing: 8 * scale) {
             Pad(symbol: "shuffle", size: 12, lit: deck.track.shuffle,
-                tip: deck.track.shuffle ? "Turn shuffle off" : "Turn shuffle on", tint: tint, pointer: pointer, act: deck.toggleShuffle, scale: scale)
+                tip: deck.track.shuffle ? "Turn shuffle off" : "Turn shuffle on", tint: tint, pointer: pointer, act: deck.toggleShuffle, scale: scale,
+                name: "Shuffle")
             Pad(symbol: "backward.end.fill", tip: "Previous track", tint: tint, pointer: pointer, act: deck.skipBack, scale: scale)
             PlayDisc(playing: deck.isPlaying, fill: tint, glyph: deck.swatch.ground, pointer: pointer, act: deck.togglePlay, scale: scale)
             Pad(symbol: "forward.end.fill", tip: "Next track", tint: tint, pointer: pointer, act: deck.skipForward, scale: scale)
             Pad(symbol: "repeat", size: 12, lit: deck.track.loop,
-                tip: deck.track.loop ? "Turn repeat off" : "Turn repeat on", tint: tint, pointer: pointer, act: deck.toggleRepeat, scale: scale)
+                tip: deck.track.loop ? "Turn repeat off" : "Turn repeat on", tint: tint, pointer: pointer, act: deck.toggleRepeat, scale: scale,
+                name: "Repeat")
         }
     }
 }
@@ -463,6 +474,14 @@ struct Scrubber: View {
                         .fixedSize()
             }
             .font(.system(size: max(8.5, 10 * scale), weight: .medium).monospacedDigit())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Playback position")
+            .accessibilityValue("\(Clock.short(shown)) of \(Clock.short(length))")
+            .accessibilityAdjustableAction { direction in
+                guard length > 0 else { return }
+                let step: Double = direction == .increment ? 10 : -10
+                deck.seek(fraction: min(1, max(0, (played + step) / length)))
+            }
         }
     }
 
@@ -516,6 +535,7 @@ struct SoundBars: View {
             }
         }
         .frame(width: 21, height: 14, alignment: .bottom)
+        .accessibilityHidden(true)
         .help(spectrum.feed == .live ? "Following the music"
               : "To make these follow the music, allow Mini Deck in System Settings > Privacy & Security > Screen & System Audio Recording")
     }
@@ -1063,6 +1083,7 @@ struct SummaryRow: View {
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
+                .accessibilityElement(children: .combine)
                 .help(tile.helpText)
             }
         }
@@ -1148,6 +1169,7 @@ struct StatCell: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: .rect(cornerRadius: 7, style: .continuous))
+        .accessibilityElement(children: .combine)
         .help(tile.helpText)
     }
 }

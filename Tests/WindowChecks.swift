@@ -201,6 +201,66 @@ struct WindowChecks {
             }
             try png.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
         }
+        // Animation frames for the README: the notch opening on the same spring the app uses.
+        if let index = CommandLine.arguments.firstIndex(of: "--notch-frames"), index + 1 < CommandLine.arguments.count {
+            let folder = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let deck = Deck()
+            let art = NSImage(size: NSSize(width: 168, height: 168), flipped: false) { rect in
+                NSGradient(colors: [NSColor(red: 0.95, green: 0.55, blue: 0.3, alpha: 1),
+                                    NSColor(red: 0.45, green: 0.25, blue: 0.7, alpha: 1)])?.draw(in: rect, angle: -60)
+                return true
+            }
+            deck.preview(Snapshot(source: .spotify, state: .paused, title: "Sample Song Title", artist: "Sample Artist",
+                                  album: "Sample Album", trackID: "spotify:track:sample", position: 74, length: 212), cover: art)
+            let notch = CGSize(width: 185, height: 32)
+            let open = CGSize(width: NotchGeometry.expandedWidth, height: notch.height + NotchGeometry.expandedBody)
+            let flare = NotchGeometry.flare
+            let state = NotchState()
+            state.notch = notch
+            state.open = open
+            // Damped spring with response 0.28 s and damping 0.8, sampled at 30 frames a second.
+            func spring(_ t: Double) -> Double {
+                let w = 2 * Double.pi / 0.28, z = 0.8, wd = w * (1 - z * z).squareRoot()
+                return 1 - exp(-z * w * t) * (cos(wd * t) + z * w / wd * sin(wd * t))
+            }
+            for frameIndex in 0..<16 {
+                let p = CGFloat(spring(Double(frameIndex) / 30))
+                let closedWidth = notch.width + 2 * NotchGeometry.wing
+                let width = closedWidth + (open.width - closedWidth) * p + 2 * flare
+                let height = notch.height + (open.height - notch.height) * p
+                let bottom = min(10, notch.height / 3) + (24 - min(10, notch.height / 3)) * p
+                let view = ZStack(alignment: .top) {
+                    Rectangle().fill(Color(white: 0.85).opacity(0.25)).frame(height: notch.height)
+                    ZStack(alignment: .top) {
+                        NotchOutline(bottom: bottom).fill(Color.black).frame(width: width, height: height)
+                        if frameIndex == 0 {
+                            NotchWings(deck: deck, spectrum: Spectrum(), soundBars: true, height: notch.height, gap: notch.width)
+                        } else {
+                            NotchPlayer(state: state, deck: deck, pointer: Pointer(), spectrum: Spectrum(), soundBars: true,
+                                        actions: NotchActions())
+                                .frame(width: open.width, height: open.height, alignment: .top)
+                                .scaleEffect(0.55 + 0.45 * min(1, p), anchor: .top)
+                                .opacity(Double(min(1, p * 1.4)))
+                        }
+                    }
+                    .mask(alignment: .top) { NotchOutline(bottom: bottom).frame(width: width, height: height) }
+                    .frame(width: open.width + 2 * flare, height: open.height, alignment: .top)
+                }
+                .frame(width: 560, height: 176, alignment: .top)
+                .background(LinearGradient(colors: [Color(red: 0.2, green: 0.3, blue: 0.5), Color(red: 0.5, green: 0.35, blue: 0.45)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing))
+                .environment(\.colorScheme, .dark)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 2
+                guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiff),
+                      let png = bitmap.representation(using: .png, properties: [:]) else {
+                    fatalError("Notch frame rendering failed")
+                }
+                try png.write(to: folder.appendingPathComponent(String(format: "frame%02d.png", frameIndex)))
+            }
+        }
         print("\(checks - failures)/\(checks) native window checks passed")
         if failures > 0 { exit(1) }
     }

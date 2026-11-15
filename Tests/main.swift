@@ -495,6 +495,31 @@ func checkOngoingPersistence() async {
 }
 
 /// The notch player sits on the camera notch, stays on screen, and opens only near the notch.
+func checkUpdates() {
+    expect(ReleaseVersion("v1.6.3")?.parts == [1, 6, 3], "tag prefix is ignored")
+    expect(ReleaseVersion("Mini Deck 1.7")?.parts == [1, 7], "release title is read")
+    expect(ReleaseVersion("latest") == nil, "text without a number is not a version")
+    expect(ReleaseVersion.isNewer("v1.6.4", than: "1.6.3"), "patch release is newer")
+    expect(ReleaseVersion.isNewer("v1.10.0", than: "1.9.9"), "numbers compare as numbers, not text")
+    expect(ReleaseVersion.isNewer("v2", than: "1.99.99"), "major release is newer")
+    expect(!ReleaseVersion.isNewer("v1.6.3", than: "1.6.3"), "same version is not newer")
+    expect(!ReleaseVersion.isNewer("v1.6", than: "1.6.0"), "missing parts count as zero")
+    expect(!ReleaseVersion.isNewer("v1.6.2", than: "1.6.3"), "older release is not newer")
+    expect(!ReleaseVersion.isNewer("nightly", than: "1.6.3"), "unreadable tag never prompts")
+    let good = Data(#"{"tag_name":"v1.7.0","html_url":"https://github.com/michaeluretzky/mini-deck/releases/tag/v1.7.0","draft":false,"prerelease":false}"#.utf8)
+    expect(LatestRelease.parse(good)?.tag == "v1.7.0", "GitHub release reply is read")
+    let beta = Data(#"{"tag_name":"v1.8.0","html_url":"https://github.com/michaeluretzky/mini-deck/releases/tag/v1.8.0","draft":false,"prerelease":true}"#.utf8)
+    expect(LatestRelease.parse(beta) == nil, "pre-releases are not offered")
+    let elsewhere = Data(#"{"tag_name":"v9.0","html_url":"https://example.com/x","draft":false,"prerelease":false}"#.utf8)
+    expect(LatestRelease.parse(elsewhere) == nil, "download link must point to GitHub")
+    expect(LatestRelease.parse(Data("oops".utf8)) == nil, "broken reply is ignored")
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    expect(LatestRelease.isDue(lastCheck: nil, now: now), "first launch checks")
+    expect(!LatestRelease.isDue(lastCheck: now.addingTimeInterval(-3600), now: now), "checks at most once a day")
+    expect(LatestRelease.isDue(lastCheck: now.addingTimeInterval(-25 * 3600), now: now), "checks again after a day")
+    expect(LatestRelease.isDue(lastCheck: now.addingTimeInterval(3600), now: now), "a clock moved back still allows a check")
+}
+
 func checkNotch() {
     // 1470 x 956 points, like a 13-inch MacBook Air, with a 185-point notch 32 points tall.
     let screen = CGRect(x: 0, y: 0, width: 1470, height: 956)
@@ -819,5 +844,6 @@ await checkPointer()
 checkResponsiveness()
 checkEnergy()
 checkNotch()
+checkUpdates()
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
