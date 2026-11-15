@@ -1,6 +1,6 @@
 # Mini Deck privacy policy
 
-Last updated: November 14, 2026
+Last updated: November 15, 2026
 
 Mini Deck is a music controller for macOS made by Michael Uretzky. This policy covers every version of Mini Deck.
 
@@ -29,12 +29,14 @@ Mini Deck sends data only to provide a feature you use:
 
 - **Spotify (optional):** if you connect your account, Mini Deck signs in with Spotify and requests your top items and recently played tracks. Access is read-only. See [Spotify's privacy policy](https://www.spotify.com/legal/privacy-policy/).
 - **Artist audience:** public monthly-listener counts are read from Spotify's public artist pages, without your account or cookies.
+- **Update check:** about once a day, Mini Deck asks GitHub for the version number of the latest public release. The request contains only the app's version. You can turn this off with Check for Updates Automatically in the menu bar.
 - **Album and artist details:** artist, album and song names are sent over HTTPS to Apple's iTunes Search, MusicBrainz, Wikidata and Wikipedia to show cover art and short descriptions. No personal information is included.
 
 ## Your choices
 
 - Turn off play counting, or clear it, from the menu bar.
 - Remove imported history or ongoing Spotify records in Setup & Help. Your original export files are never changed.
+- Turn off automatic update checks from the menu bar.
 - Disconnect Spotify at any time. This deletes the sign-in token from your keychain.
 - Deleting the app removes its private folder.
 

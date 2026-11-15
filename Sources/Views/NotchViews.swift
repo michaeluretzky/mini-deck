@@ -55,6 +55,7 @@ struct NotchRoot: View {
     let spectrum: Spectrum
     let soundBars: Bool
     let actions: NotchActions
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let open = state.expanded
@@ -63,8 +64,9 @@ struct NotchRoot: View {
         let closedWidth = state.notch.width + (wings ? 2 * NotchGeometry.wing : 0)
         let width = (open ? state.open.width : closedWidth) + 2 * flare
         let height = open ? state.open.height : state.notch.height
+        let bottom = open ? 24 : min(10, state.notch.height / 3)
         ZStack(alignment: .top) {
-            NotchOutline(bottom: open ? 24 : min(10, state.notch.height / 3))
+            NotchOutline(bottom: bottom)
                 .fill(Color.black)
                 .frame(width: width, height: height)
             Group {
@@ -72,8 +74,9 @@ struct NotchRoot: View {
                     NotchPlayer(state: state, deck: deck, pointer: pointer, spectrum: spectrum, soundBars: soundBars,
                                 actions: actions)
                         .frame(width: state.open.width, height: state.open.height, alignment: .top)
-                        .transition(.asymmetric(insertion: .scale(scale: 0.55, anchor: .top).combined(with: .opacity),
-                                                removal: .opacity))
+                        .transition(reduceMotion ? .opacity
+                                    : .asymmetric(insertion: .scale(scale: 0.55, anchor: .top).combined(with: .opacity),
+                                                  removal: .opacity))
                 } else if wings {
                     NotchWings(deck: deck, spectrum: spectrum, soundBars: soundBars, height: state.notch.height,
                                gap: state.notch.width)
@@ -81,11 +84,16 @@ struct NotchRoot: View {
                 }
             }
         }
+        // Keeps the growing player inside the black shape while both animate.
+        .mask(alignment: .top) {
+            NotchOutline(bottom: bottom).frame(width: width, height: height)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(.named(Space.deck))
         .environment(\.colorScheme, .dark)
         // Starts in the same frame as the pointer move, then grows from the notch to full size.
-        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: open)
+        // Reduce Motion swaps the grow for a short fade.
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.28, dampingFraction: 0.8), value: open)
         .animation(.easeOut(duration: 0.18), value: wings)
     }
 }
@@ -117,6 +125,8 @@ struct NotchWings: View {
             .frame(width: NotchGeometry.wing, alignment: .center)
         }
         .frame(height: height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Now playing: \(deck.track.title) by \(deck.track.artist)")
         .help(deck.track.title + " · " + deck.track.artist)
     }
 }
@@ -164,6 +174,7 @@ struct NotchPlayer: View {
                     }
                     .buttonStyle(Squish())
                     .help("Show \(deck.source.appName)")
+                    .accessibilityLabel("Album cover, \(deck.track.album). Show \(deck.source.appName)")
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 2) {

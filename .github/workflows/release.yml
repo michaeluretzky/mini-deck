@@ -25,9 +25,39 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
+      # Optional. When the Developer ID secrets are set, the app is signed and notarized
+      # so it opens with a normal double-click. Without them, this step does nothing.
+      - name: Load Developer ID certificate
+        id: signing
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CERT_P12" || -z "$CERT_PASSWORD" || -z "$SIGN_IDENTITY" ]]; then
+            echo "No Developer ID secrets; the release keeps its ad hoc signature."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "identity=$SIGN_IDENTITY" >> "$GITHUB_OUTPUT"
+
       - name: Build universal app
         env:
           MINIDECK_SPOTIFY_CLIENT_ID: ${{ vars.MINIDECK_SPOTIFY_CLIENT_ID }}
+          MINIDECK_SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          MINIDECK_NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          MINIDECK_NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          MINIDECK_NOTARY_PASSWORD: ${{ secrets.NOTARY_APP_PASSWORD }}
         run: zsh make-release.zsh
 
       - name: Publish release

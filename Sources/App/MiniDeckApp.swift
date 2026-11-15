@@ -54,6 +54,8 @@ final class Hub {
     let wrapped = WrappedLibrary()
     let statsMemo = StatsMemo()
     let energy = Energy()
+    let updates = Updates()
+    let hotKeys = HotKeys()
     private let historyWindow = HistoryWindow()
     private let setupWindow = SetupWindow()
     private var started = false
@@ -114,6 +116,13 @@ final class Hub {
                 try? await Task.sleep(for: .seconds(120))
             }
         }
+        hotKeys.perform = { [weak self] action in self?.shortcut(action) }
+        if prefs.hotKeys { hotKeys.enable() }
+        updates.onFound = { [weak self] release in
+            let version = ReleaseVersion(release.tag)?.description ?? release.tag
+            self?.deck.flash("arrow.down.circle", "Mini Deck \(version) is available")
+        }
+        updates.start()
         if !UserDefaults.standard.bool(forKey: "minideck.setupShown") {
             UserDefaults.standard.set(true, forKey: "minideck.setupShown")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showSetup() }
@@ -160,6 +169,28 @@ final class Hub {
     }
 
     // MARK: Menu actions
+
+    private func shortcut(_ action: HotKeys.Action) {
+        switch action {
+        case .playPause: deck.togglePlay()
+        case .next: deck.skipForward()
+        case .previous: deck.skipBack()
+        case .togglePlayer: togglePlayer()
+        }
+    }
+
+    func setHotKeys(_ on: Bool) {
+        prefs.hotKeys = on
+        if on {
+            hotKeys.enable()
+            if !hotKeys.unavailable.isEmpty {
+                let taken = hotKeys.unavailable.map(\.keys).joined(separator: ", ")
+                deck.flash("keyboard", "Another app already uses \(taken)")
+            }
+        } else {
+            hotKeys.disable()
+        }
+    }
 
     /// Moves the player between its floating window and the camera notch.
     func setNotchMode(_ on: Bool) {
@@ -354,6 +385,7 @@ enum PrefKey {
     static let statsAdvanced = "minideck.statsAdvanced"
     static let spotifySpan = "minideck.spotifySpan"
     static let exportRequested = "minideck.exportRequested"
+    static let hotKeys = "minideck.hotKeys"
 }
 
 @MainActor @Observable
@@ -382,6 +414,9 @@ final class Prefs {
     var exportRequested: Bool {
         didSet { UserDefaults.standard.set(exportRequested, forKey: PrefKey.exportRequested) }
     }
+    var hotKeys: Bool {
+        didSet { UserDefaults.standard.set(hotKeys, forKey: PrefKey.hotKeys) }
+    }
     private(set) var openAtLogin: Bool
 
     init() {
@@ -394,6 +429,7 @@ final class Prefs {
         statsAdvanced = store.bool(forKey: PrefKey.statsAdvanced)
         spotifySpan = store.string(forKey: PrefKey.spotifySpan).flatMap(SpotifyAccount.Span.init(rawValue:)) ?? .short
         exportRequested = store.bool(forKey: PrefKey.exportRequested)
+        hotKeys = store.object(forKey: PrefKey.hotKeys) as? Bool ?? true
         openAtLogin = SMAppService.mainApp.status == .enabled
         if !store.bool(forKey: PrefKey.loginSeeded) {
             store.set(true, forKey: PrefKey.loginSeeded)
@@ -412,6 +448,10 @@ struct StatusMenu: View {
     let hub: Hub
 
     var body: some View {
+        if let version = hub.updates.availableVersion {
+            Button("Download Mini Deck \(version)…") { hub.updates.openDownload() }
+            Divider()
+        }
         Button(hub.playerShown ? "Hide Player" : "Show Player") { hub.togglePlayer() }
         Button("Open \(hub.deck.source.appName)") { hub.deck.revealApp() }
         Menu("Follow") {
@@ -430,6 +470,10 @@ struct StatusMenu: View {
         Button("Listening History…") { hub.showHistory() }
             .keyboardShortcut("y")
         Button("Setup & Help…") { hub.showSetup() }
+        Button(hub.updates.checking ? "Checking for Updates…" : "Check for Updates…") {
+            Task { await hub.updates.check(manual: true) }
+        }
+        .disabled(hub.updates.checking)
         Menu("Listening Stats") {
             Button(hub.archive.busy ? "Importing Spotify History…" : "Import Full Spotify History…") { hub.importSpotifyHistory() }
                 .disabled(hub.archive.busy || hub.archive.loading)
@@ -478,6 +522,16 @@ struct StatusMenu: View {
             .disabled(hub.prefs.notchMode)
         Toggle("Sound Bars", isOn: Binding(get: { hub.prefs.soundBars },
                                            set: { hub.prefs.soundBars = $0 }))
+        Menu("Keyboard Shortcuts") {
+            Toggle("Use Keyboard Shortcuts", isOn: Binding(get: { hub.prefs.hotKeys },
+                                                         set: { hub.setHotKeys($0) }))
+            Divider()
+            ForEach(HotKeys.Action.allCases, id: \.rawValue) { action in
+                Text("\(action.title)   \(action.keys)")
+            }
+        }
+        Toggle("Check for Updates Automatically", isOn: Binding(get: { hub.updates.automatic },
+                                                                 set: { hub.updates.automatic = $0 }))
         Toggle("Open at Login", isOn: Binding(get: { hub.prefs.openAtLogin },
                                               set: { hub.prefs.setOpenAtLogin($0) }))
         Divider()
